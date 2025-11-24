@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,13 +13,14 @@ export default function TelegramSetup() {
   const [deployedExpenseWebhookUrl, setDeployedExpenseWebhookUrl] = useState("");
   
   const testMessage = `汇款日期: 2024-01-15
+维护期: 15
 币种: EUR
-账户名: Zhang San
-账户号码: DE89370400440532013000
+汇款人姓名: Zhang San
+入款账户名: ABC Company Ltd
+入款账户号: DE89370400440532013000
 银行名称: Deutsche Bank
-金额: 5000
-佣金: 11
-汇率: 1.1`;
+金额: 5000`;
+
 
   const testExpenseMessage = `标题: 午餐
 商家: 麦当劳
