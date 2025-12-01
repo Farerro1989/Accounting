@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { TelegramMessage } from "@/entities/TelegramMessage";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +8,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Send, Paperclip, Search, FileText, Image as ImageIcon, User, MessageSquare, Bot } from "lucide-react";
 import { format } from "date-fns";
-import { toast } from "sonner";
 
 export default function TelegramMessages() {
   const [messages, setMessages] = useState([]);
@@ -37,7 +35,7 @@ export default function TelegramMessages() {
 
   const loadMessages = async () => {
     try {
-      const data = await TelegramMessage.list("-created_date", 100); // Fetch last 100 messages
+      const data = await base44.entities.TelegramMessage.list("-created_date", 100); // Fetch last 100 messages
       // Sort by date asc for chat view
       const sorted = data.sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
       setMessages(sorted);
@@ -67,11 +65,10 @@ export default function TelegramMessages() {
         });
         
         setReplyText("");
-        toast.success("消息已发送");
         loadMessages(); // Reload to show new message
     } catch (error) {
         console.error("发送失败:", error);
-        toast.error("发送失败，请检查网络或Token");
+        alert("发送失败，请检查网络或Token");
     } finally {
         setSending(false);
     }
