@@ -23,7 +23,7 @@ const FUND_STATUSES = [
   "风控调解中", "冻结（正在处理）", "冻结（不能处理）"
 ];
 
-export default function TransactionForm({ transaction, onSubmit, onCancel }) {
+export default function TransactionForm({ transaction, initialTransferInfo = "", onSubmit, onCancel }) {
   const [formData, setFormData] = useState(transaction || {
     customer_name: "",
     receiving_account_name: "",
@@ -40,7 +40,7 @@ export default function TransactionForm({ transaction, onSubmit, onCancel }) {
     acceptance_usdt: 0
   });
 
-  const [transferInfo, setTransferInfo] = useState("");
+  const [transferInfo, setTransferInfo] = useState(initialTransferInfo);
   const [isProcessing, setIsProcessing] = useState(false);
   const [parseError, setParseError] = useState("");
   const [isFetchingRate, setIsFetchingRate] = useState(false);

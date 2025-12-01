@@ -11,11 +11,16 @@ import { format } from "date-fns";
 
 export default function TelegramMessages() {
   const [messages, setMessages] = useState([]);
+  const [transactionMap, setTransactionMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [replyText, setReplyText] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [sending, setSending] = useState(false);
+  
+  const [showTransactionModal, setShowTransactionModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [initialTransferInfo, setInitialTransferInfo] = useState("");
   
   const scrollRef = useRef(null);
 
@@ -35,9 +40,22 @@ export default function TelegramMessages() {
 
   const loadMessages = async () => {
     try {
-      const data = await base44.entities.TelegramMessage.list("-created_date", 100); // Fetch last 100 messages
+      const [msgData, txnData] = await Promise.all([
+        base44.entities.TelegramMessage.list("-created_date", 100),
+        base44.entities.Transaction.list("-created_date", 100)
+      ]);
+      
+      // Map transactions by telegram_message_id
+      const txnMap = {};
+      txnData.forEach(t => {
+        if (t.telegram_message_id) {
+          txnMap[t.telegram_message_id] = t;
+        }
+      });
+      setTransactionMap(txnMap);
+
       // Sort by date asc for chat view
-      const sorted = data.sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
+      const sorted = msgData.sort((a, b) => new Date(a.created_date) - new Date(b.created_date));
       setMessages(sorted);
       
       if (!selectedChatId && sorted.length > 0) {
@@ -49,6 +67,42 @@ export default function TelegramMessages() {
       console.error("加载消息失败:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditTransaction = (txn) => {
+    setEditingTransaction(txn);
+    setInitialTransferInfo("");
+    setShowTransactionModal(true);
+  };
+
+  const handleCreateTransaction = (msg) => {
+    setEditingTransaction({
+        source: 'telegram',
+        telegram_chat_id: msg.chat_id,
+        telegram_message_id: msg.message_id,
+        deposit_date: format(new Date(), "yyyy-MM-dd"),
+        // Set other defaults if needed
+    });
+    setInitialTransferInfo(msg.content || "");
+    setShowTransactionModal(true);
+  };
+
+  const handleTransactionSubmit = async (data) => {
+    try {
+        if (data.id) {
+            await Transaction.update(data.id, data);
+            toast.success("交易已更新");
+        } else {
+            await Transaction.create(data);
+            toast.success("交易已创建");
+        }
+        setShowTransactionModal(false);
+        setEditingTransaction(null);
+        loadMessages(); // Reload to refresh links
+    } catch (error) {
+        console.error("保存交易失败:", error);
+        toast.error("保存失败: " + error.message);
     }
   };
 
@@ -235,13 +289,42 @@ export default function TelegramMessages() {
                       )}
                     </div>
 
-                    {/* Metadata */}
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400 px-1">
-                        <span>{format(new Date(msg.created_date), 'MM-dd HH:mm')}</span>
-                        {msg.tags && msg.tags.length > 0 && (
-                            <div className="flex gap-1">
-                                <span>•</span>
-                                {msg.tags.map(t => <span key={t}>#{t}</span>)}
+                    {/* Metadata & Actions */}
+                    <div className="flex items-center justify-between gap-2 mt-1 px-1">
+                        <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                            <span>{format(new Date(msg.created_date), 'MM-dd HH:mm')}</span>
+                            {msg.tags && msg.tags.length > 0 && (
+                                <div className="flex gap-1">
+                                    <span>•</span>
+                                    {msg.tags.map(t => <span key={t}>#{t}</span>)}
+                                </div>
+                            )}
+                        </div>
+                        
+                        {/* Transaction Actions */}
+                        {msg.direction === 'incoming' && (
+                            <div className="flex items-center gap-2">
+                                {transactionMap[msg.message_id] ? (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-5 px-2 text-[10px] bg-green-50 text-green-600 hover:bg-green-100 hover:text-green-700"
+                                        onClick={() => handleEditTransaction(transactionMap[msg.message_id])}
+                                    >
+                                        <Edit className="w-3 h-3 mr-1" />
+                                        已录入 {transactionMap[msg.message_id].deposit_amount}
+                                    </Button>
+                                ) : (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-5 px-2 text-[10px] text-slate-400 hover:bg-blue-50 hover:text-blue-600"
+                                        onClick={() => handleCreateTransaction(msg)}
+                                    >
+                                        <PlusCircle className="w-3 h-3 mr-1" />
+                                        录入交易
+                                    </Button>
+                                )}
                             </div>
                         )}
                     </div>
@@ -249,6 +332,20 @@ export default function TelegramMessages() {
                   </div>
                 </div>
               ))}
+              
+              {/* Transaction Modal */}
+              <Dialog open={showTransactionModal} onOpenChange={setShowTransactionModal}>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    {showTransactionModal && (
+                        <TransactionForm 
+                            transaction={editingTransaction}
+                            initialTransferInfo={initialTransferInfo}
+                            onSubmit={handleTransactionSubmit}
+                            onCancel={() => setShowTransactionModal(false)}
+                        />
+                    )}
+                </DialogContent>
+              </Dialog>
             </div>
 
             {/* Input Area */}
