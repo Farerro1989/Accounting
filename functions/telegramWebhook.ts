@@ -415,25 +415,24 @@ Deno.serve(async (req) => {
     let idCardPhotoUrl = '';
     let transferReceiptUrl = '';
     let transferData = null;
-    
+    const allFileUrls = []; // 收集所有文件链接用于保存消息记录
+
+    // 1. 处理图片
     for (let i = 0; i < photos.length; i++) {
       try {
         const photoId = photos[i];
         const imageBlob = await downloadTelegramFile(photoId);
         
-        // 上传保存图片
         const uploadResult = await base44.asServiceRole.integrations.Core.UploadFile({
           file: imageBlob
         });
         const imageUrl = uploadResult.file_url;
+        allFileUrls.push(imageUrl);
         
-        // 第一张图：证件照
         if (i === 0) {
           idCardPhotoUrl = imageUrl;
           console.log('🪪 收录证件照:', imageUrl);
-        } 
-        // 第二张图：转账单（仍需AI识别提取数据）
-        else if (i === 1) {
+        } else if (i === 1) {
           console.log('💳 分析转账单提取数据...');
           const analysis = await analyzeTransferReceipt(base44, imageBlob);
           if (analysis) {
@@ -441,13 +440,83 @@ Deno.serve(async (req) => {
             transferData = analysis;
           }
         }
-        // 其他图片：直接收录，不做任何比对
-        else {
-          console.log(`📎 收录附加图片 ${i + 1}:`, imageUrl);
-        }
       } catch (error) {
         console.error('❌ 图片处理失败:', error);
       }
+    }
+
+    // 2. 处理文档 (PDF, Word, etc.)
+    if (message.document) {
+      try {
+        console.log('📄 检测到文档:', message.document.file_name);
+        const docFileId = message.document.file_id;
+        const docBlob = await downloadTelegramFile(docFileId);
+        
+        const uploadResult = await base44.asServiceRole.integrations.Core.UploadFile({
+          file: docBlob
+        });
+        const docUrl = uploadResult.file_url;
+        allFileUrls.push(docUrl);
+        console.log('📎 文档已保存:', docUrl);
+
+        // 如果是PDF或图片类文档，尝试作为水单分析
+        const mimeType = message.document.mime_type || '';
+        if (!transferData && (mimeType.includes('pdf') || mimeType.includes('image'))) {
+           // 这里简单复用analyzeTransferReceipt，虽然它主要是为图片设计的，但如果LLM支持多模态或我们有转换逻辑则可行
+           // 目前Core.InvokeLLM支持file_urls，我们可以尝试传入文档URL让LLM提取
+           console.log('🤖 尝试分析文档内容...');
+           const analysis = await analyzeDocument(base44, docUrl);
+           if (analysis) {
+             transferData = analysis;
+             // 如果是文档作为水单，我们没有"图片URL"，但可以记录文档URL
+             if (!transferReceiptUrl) transferReceiptUrl = docUrl;
+           }
+        }
+      } catch (error) {
+        console.error('❌ 文档处理失败:', error);
+      }
+    }
+
+    // 3. 保存消息记录 (双向同步基础)
+    try {
+      // 简单的分类逻辑
+      let category = 'other';
+      let tags = [];
+      
+      if (text) {
+        if (text.includes('汇款') || text.includes('转账') || text.includes('水单')) {
+          category = 'transaction';
+          tags.push('transaction');
+        }
+        if (text.includes('你好') || text.includes('在吗')) {
+          category = 'inquiry';
+          tags.push('greeting');
+        }
+      }
+      if (allFileUrls.length > 0) {
+        tags.push('has_attachment');
+        if (message.document) tags.push('document');
+        if (photos.length > 0) tags.push('photo');
+      }
+
+      // 异步调用LLM进行更智能的分类（不阻塞主流程）
+      // 注意：在Serverless环境中最好await，否则可能被冻结。为了响应速度，这里用简单规则，或者快速LLM调用。
+      
+      await base44.asServiceRole.entities.TelegramMessage.create({
+        chat_id: String(chatId),
+        message_id: String(message.message_id),
+        sender_name: senderName,
+        content: text || (allFileUrls.length > 0 ? '[文件消息]' : '[未知消息]'),
+        file_urls: allFileUrls,
+        file_type: allFileUrls.length > 0 ? (message.document ? 'document' : 'photo') : 'text',
+        direction: 'incoming',
+        tags: tags,
+        category: category,
+        status: 'unread'
+      });
+      console.log('💾 消息已存档');
+    } catch (error) {
+      console.error('❌ 消息存档失败:', error);
     }
     
     // 合并数据
