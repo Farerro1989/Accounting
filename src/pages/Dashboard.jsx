@@ -17,7 +17,7 @@ import MaintenanceAlert from "../components/dashboard/MaintenanceAlert";
 export default function Dashboard() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [timeFilter, setTimeFilter] = useState("today");
+  const [timeFilter, setTimeFilter] = useState("month");
   const [selectedQuarter, setSelectedQuarter] = useState("Q1");
   const [selectedYear, setSelectedYear] = useState("2025");
   const [selectedStatus, setSelectedStatus] = useState(null);
@@ -315,22 +315,23 @@ export default function Dashboard() {
         stats[company][currency] = {
           count: 0,
           totalAmount: 0,
-          accounts: new Set(),
-          transactions: []
+          accountDetails: {} // 用于存储每个账户的具体统计
         };
       }
 
+      // 总计
       stats[company][currency].count += 1;
       stats[company][currency].totalAmount += (t.deposit_amount || 0);
-      stats[company][currency].accounts.add(account);
-      stats[company][currency].transactions.push(t);
-    });
 
-    // Convert Sets to Arrays
-    Object.keys(stats).forEach(company => {
-      Object.keys(stats[company]).forEach(currency => {
-        stats[company][currency].accounts = Array.from(stats[company][currency].accounts);
-      });
+      // 单个账户统计
+      if (!stats[company][currency].accountDetails[account]) {
+        stats[company][currency].accountDetails[account] = {
+          count: 0,
+          amount: 0
+        };
+      }
+      stats[company][currency].accountDetails[account].count += 1;
+      stats[company][currency].accountDetails[account].amount += (t.deposit_amount || 0);
     });
 
     return stats;
@@ -653,9 +654,24 @@ export default function Dashboard() {
                               </span>
                             </div>
                             <div className="pt-2 border-t border-slate-100">
-                              <span className="text-xs text-slate-500">使用账户: {data.accounts.length} 个</span>
-                              <div className="mt-1 text-xs text-slate-400 font-mono truncate" title={data.accounts.join(', ')}>
-                                {data.accounts[0]}{data.accounts.length > 1 ? ` +${data.accounts.length - 1}` : ''}
+                              <span className="text-xs text-slate-500 font-medium">账户明细 ({Object.keys(data.accountDetails).length}个):</span>
+                              <div className="mt-2 space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+                                {Object.entries(data.accountDetails).map(([account, detail]) => (
+                                  <div key={account} className="bg-slate-50 rounded p-2 text-xs">
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="font-mono text-slate-600 font-medium truncate flex-1 mr-2" title={account}>
+                                        {account}
+                                      </span>
+                                      <span className="text-indigo-600 font-bold">{detail.count}笔</span>
+                                    </div>
+                                    <div className="text-right text-emerald-600">
+                                      {detail.amount.toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2
+                                      })}
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           </div>
