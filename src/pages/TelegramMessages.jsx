@@ -11,7 +11,6 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Send, Paperclip, Search, FileText, Image as ImageIcon, User, MessageSquare, Bot, Edit, PlusCircle } from "lucide-react";
 import { format } from "date-fns";
-import { toast } from "sonner";
 
 export default function TelegramMessages() {
   const [messages, setMessages] = useState([]);
@@ -96,17 +95,17 @@ export default function TelegramMessages() {
     try {
         if (data.id) {
             await Transaction.update(data.id, data);
-            toast.success("交易已更新");
+            alert("交易已更新");
         } else {
             await Transaction.create(data);
-            toast.success("交易已创建");
+            alert("交易已创建");
         }
         setShowTransactionModal(false);
         setEditingTransaction(null);
         loadMessages(); // Reload to refresh links
     } catch (error) {
         console.error("保存交易失败:", error);
-        toast.error("保存失败: " + error.message);
+        alert("保存失败: " + error.message);
     }
   };
 
