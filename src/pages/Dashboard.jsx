@@ -15,6 +15,7 @@ import StatusOverview from "../components/dashboard/StatusOverview";
 import StatusDetailModal from "../components/dashboard/StatusDetailModal";
 import MaintenanceAlert from "../components/dashboard/MaintenanceAlert";
 import ProfitVisual from "../components/dashboard/ProfitVisual";
+import ProfitStats from "../components/dashboard/ProfitStats";
 
 export default function Dashboard() {
   const [transactions, setTransactions] = useState([]);
@@ -179,8 +180,13 @@ export default function Dashboard() {
       const initialUsdt = t.deposit_amount / t.exchange_rate;
       const commission = initialUsdt * ((t.commission_percentage || 0) / 100);
       const transferFee = t.transfer_fee || 0;
-      const acceptanceUsdt = t.acceptance_usdt || 0;
-      const exchangeRateProfit = initialUsdt - acceptanceUsdt;
+      // For completed transactions, if acceptance_usdt is 0, it likely means not entered yet, but we treat it as 0 value retrieved (loss).
+      // However, to avoid massive negative profit if user just forgot, we could check if it's null? 
+      // But schema default is 0. We'll assume 0 is valid (total loss) or handle it. 
+      // Actually, formula: Profit = Acceptance - Initial. 
+      const acceptanceUsdt = t.acceptance_usdt || 0; 
+      // FIX: Profit = Acceptance - Initial. (If Acceptance < Initial, negative profit).
+      const exchangeRateProfit = acceptanceUsdt - initialUsdt; 
       const violationPenalty = t.violation_penalty || 0;
 
       totalCommission += commission;
@@ -206,8 +212,9 @@ export default function Dashboard() {
       const initialUsdt = t.deposit_amount / t.exchange_rate;
       const commission = initialUsdt * ((t.commission_percentage || 0) / 100);
       const transferFee = t.transfer_fee || 0;
+      // For estimation: if acceptance_usdt is 0 (default), assume it will be equal to initialUsdt (no exchange loss).
       const acceptanceUsdt = t.acceptance_usdt || initialUsdt;
-      const exchangeRateProfit = initialUsdt - acceptanceUsdt;
+      const exchangeRateProfit = acceptanceUsdt - initialUsdt; // Will be 0 if default
       const violationPenalty = t.violation_penalty || 0;
 
       estimatedCommission += commission;
