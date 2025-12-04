@@ -14,6 +14,7 @@ import TransactionChart from "../components/dashboard/TransactionChart";
 import StatusOverview from "../components/dashboard/StatusOverview";
 import StatusDetailModal from "../components/dashboard/StatusDetailModal";
 import MaintenanceAlert from "../components/dashboard/MaintenanceAlert";
+import ProfitVisual from "../components/dashboard/ProfitVisual";
 
 export default function Dashboard() {
   const [transactions, setTransactions] = useState([]);
@@ -505,7 +506,7 @@ export default function Dashboard() {
                   <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6 shadow-lg">
                     <div className="flex items-start justify-between">
                       <div className="space-y-2 flex-1">
-                        <p className="text-sm font-medium text-slate-600">总盈利</p>
+                        <p className="text-sm font-medium text-slate-600">实际盈利</p>
                         <p className="text-2xl font-bold text-purple-600">
                           {profitMetrics.profit.toLocaleString(undefined, { 
                             minimumFractionDigits: 2, 
@@ -514,7 +515,7 @@ export default function Dashboard() {
                         </p>
                         <p className="text-xs text-slate-500">佣金+手续费+汇率差-罚金</p>
                         <p className="text-sm text-slate-400 italic mt-2">
-                          预计: {profitMetrics.estimatedProfit.toLocaleString(undefined, { 
+                          预计盈利: {profitMetrics.estimatedProfit.toLocaleString(undefined, { 
                             minimumFractionDigits: 2, 
                             maximumFractionDigits: 2 
                           })} USDT
@@ -526,6 +527,8 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
+
+                <ProfitVisual profitMetrics={profitMetrics} />
 
                 {profitMetrics.completedCount === 0 && (
                   <Alert className="mt-4 bg-blue-50 border-blue-200">
