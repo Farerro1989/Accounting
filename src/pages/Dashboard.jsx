@@ -33,7 +33,7 @@ export default function Dashboard() {
       setLoading(true);
       try {
         const [transactionData, userData] = await Promise.all([
-          Transaction.list("-created_date"),
+          Transaction.list("-created_date", 1000),
           User.me()
         ]);
         setTransactions(transactionData);
@@ -60,7 +60,7 @@ export default function Dashboard() {
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      const data = await Transaction.list("-created_date");
+      const data = await Transaction.list("-created_date", 1000);
       setTransactions(data);
     } catch (error) {
       console.error("加载交易数据失败:", error);
@@ -173,21 +173,22 @@ export default function Dashboard() {
     let completedCount = 0;
 
     for (const t of completedTransactions) {
-      if (!t.deposit_amount || !t.exchange_rate || t.exchange_rate === 0) {
+      const depositAmount = parseFloat(t.deposit_amount);
+      const exchangeRate = parseFloat(t.exchange_rate);
+      
+      if (!depositAmount || !exchangeRate || exchangeRate === 0) {
         continue;
       }
 
-      const initialUsdt = t.deposit_amount / t.exchange_rate;
-      const commission = initialUsdt * ((t.commission_percentage || 0) / 100);
-      const transferFee = t.transfer_fee || 0;
-      // For completed transactions, if acceptance_usdt is 0, it likely means not entered yet, but we treat it as 0 value retrieved (loss).
-      // However, to avoid massive negative profit if user just forgot, we could check if it's null? 
-      // But schema default is 0. We'll assume 0 is valid (total loss) or handle it. 
-      // Actually, formula: Profit = Acceptance - Initial. 
-      const acceptanceUsdt = t.acceptance_usdt || 0; 
-      // FIX: Profit = Acceptance - Initial. (If Acceptance < Initial, negative profit).
+      const initialUsdt = depositAmount / exchangeRate;
+      const commission = initialUsdt * ((parseFloat(t.commission_percentage) || 0) / 100);
+      const transferFee = parseFloat(t.transfer_fee) || 0;
+      
+      // Use acceptance_usdt if present, otherwise fall back to initialUsdt (assuming break-even on exchange if not entered)
+      // This prevents massive negative profit when user hasn't entered acceptance data yet
+      const acceptanceUsdt = parseFloat(t.acceptance_usdt) || initialUsdt; 
       const exchangeRateProfit = acceptanceUsdt - initialUsdt; 
-      const violationPenalty = t.violation_penalty || 0;
+      const violationPenalty = parseFloat(t.violation_penalty) || 0;
 
       totalCommission += commission;
       totalTransferFee += transferFee;
@@ -205,17 +206,20 @@ export default function Dashboard() {
     let estimatedCount = 0;
 
     for (const t of filteredTransactions) {
-      if (!t.deposit_amount || !t.exchange_rate || t.exchange_rate === 0) {
+      const depositAmount = parseFloat(t.deposit_amount);
+      const exchangeRate = parseFloat(t.exchange_rate);
+
+      if (!depositAmount || !exchangeRate || exchangeRate === 0) {
         continue;
       }
 
-      const initialUsdt = t.deposit_amount / t.exchange_rate;
-      const commission = initialUsdt * ((t.commission_percentage || 0) / 100);
-      const transferFee = t.transfer_fee || 0;
-      // For estimation: if acceptance_usdt is 0 (default), assume it will be equal to initialUsdt (no exchange loss).
-      const acceptanceUsdt = t.acceptance_usdt || initialUsdt;
-      const exchangeRateProfit = acceptanceUsdt - initialUsdt; // Will be 0 if default
-      const violationPenalty = t.violation_penalty || 0;
+      const initialUsdt = depositAmount / exchangeRate;
+      const commission = initialUsdt * ((parseFloat(t.commission_percentage) || 0) / 100);
+      const transferFee = parseFloat(t.transfer_fee) || 0;
+      
+      const acceptanceUsdt = parseFloat(t.acceptance_usdt) || initialUsdt;
+      const exchangeRateProfit = acceptanceUsdt - initialUsdt;
+      const violationPenalty = parseFloat(t.violation_penalty) || 0;
 
       estimatedCommission += commission;
       estimatedTransferFee += transferFee;
