@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { TrendingUp, DollarSign, CreditCard, Calendar, BarChartHorizontal, Coins, Calculator, Target, AlertCircle } from "lucide-react";
+import { TrendingUp, DollarSign, CreditCard, Calendar, BarChartHorizontal, Coins, Calculator, Target, AlertCircle, Download } from "lucide-react";
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, isValid, isWithinInterval, startOfYear, endOfYear } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { base44 } from "@/api/base44Client";
+import { Button } from "@/components/ui/button";
 
 import StatCard from "../components/dashboard/StatCard";
 import TransactionChart from "../components/dashboard/TransactionChart";
@@ -16,6 +18,8 @@ import StatusDetailModal from "../components/dashboard/StatusDetailModal";
 import MaintenanceAlert from "../components/dashboard/MaintenanceAlert";
 import ProfitVisual from "../components/dashboard/ProfitVisual";
 import ProfitStats from "../components/dashboard/ProfitStats";
+import ProfitReportTable from "../components/dashboard/ProfitReportTable";
+import CustomerStatsChart from "../components/dashboard/CustomerStatsChart";
 
 export default function Dashboard() {
   const [transactions, setTransactions] = useState([]);
@@ -410,6 +414,30 @@ export default function Dashboard() {
           </div>
           
           <div className="flex flex-col md:flex-row gap-4 items-end">
+            <Button 
+              variant="outline" 
+              className="bg-white/80 backdrop-blur-sm hover:bg-white"
+              onClick={async () => {
+                try {
+                  const { data } = await base44.functions.invoke('exportTransactionsToCsv');
+                  const blob = new Blob([data], { type: 'text/csv;charset=utf-8;' });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  a.remove();
+                } catch (e) {
+                  console.error("Export failed:", e);
+                  alert("导出失败，请重试");
+                }
+              }}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              导出流水
+            </Button>
             <Tabs value={timeFilter} onValueChange={setTimeFilter} className="w-full md:w-auto">
               <TabsList className="grid w-full grid-cols-5 bg-white/80 backdrop-blur-sm border border-slate-200">
                 <TabsTrigger value="today" className="flex items-center gap-2">
@@ -474,6 +502,7 @@ export default function Dashboard() {
               currentUser={currentUser}
               timeFilterLabel={getTimeFilterLabel()}
             />
+            <ProfitReportTable transactions={transactions} />
             <ProfitVisual profitMetrics={profitMetrics} />
           </>
         )}
@@ -640,6 +669,8 @@ export default function Dashboard() {
           />
           <TransactionChart transactions={getFilteredTransactions()} loading={loading} />
         </div>
+
+        <CustomerStatsChart transactions={getFilteredTransactions()} />
 
         {showStatusModal && selectedStatus && (
           <StatusDetailModal

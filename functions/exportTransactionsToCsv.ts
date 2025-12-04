@@ -10,8 +10,8 @@ Deno.serve(async (req) => {
             return Response.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        // 获取所有交易数据
-        const transactions = await base44.entities.Transaction.list("-created_date");
+        // 获取所有交易数据 (Limit increased to 10000 to cover most exports)
+        const transactions = await base44.entities.Transaction.list("-created_date", 10000);
         
         // CSV头部
         const headers = [
