@@ -183,12 +183,17 @@ export default function Dashboard() {
       const initialUsdt = depositAmount / exchangeRate;
       const commission = initialUsdt * ((parseFloat(t.commission_percentage) || 0) / 100);
       const transferFee = parseFloat(t.transfer_fee) || 0;
-      
-      // Use acceptance_usdt if present, otherwise fall back to initialUsdt (assuming break-even on exchange if not entered)
-      // This prevents massive negative profit when user hasn't entered acceptance data yet
-      const acceptanceUsdt = parseFloat(t.acceptance_usdt) || initialUsdt; 
-      const exchangeRateProfit = acceptanceUsdt - initialUsdt; 
       const violationPenalty = parseFloat(t.violation_penalty) || 0;
+      
+      // Logic: Actual Profit = Deposit (Initial) - Acceptance (Cost)
+      // If Acceptance is missing, default to Projected Cost (Initial - Comm - Fee), so Profit = Comm + Fee
+      const projectedSettlement = initialUsdt - commission - transferFee;
+      const acceptanceUsdt = parseFloat(t.acceptance_usdt) > 0 ? parseFloat(t.acceptance_usdt) : projectedSettlement;
+      
+      const tradeProfit = initialUsdt - acceptanceUsdt;
+      
+      // Derived spread so that: Profit = Comm + Fee + Spread - Penalty
+      const exchangeRateProfit = tradeProfit - commission - transferFee + violationPenalty;
 
       totalCommission += commission;
       totalTransferFee += transferFee;
@@ -216,10 +221,13 @@ export default function Dashboard() {
       const initialUsdt = depositAmount / exchangeRate;
       const commission = initialUsdt * ((parseFloat(t.commission_percentage) || 0) / 100);
       const transferFee = parseFloat(t.transfer_fee) || 0;
-      
-      const acceptanceUsdt = parseFloat(t.acceptance_usdt) || initialUsdt;
-      const exchangeRateProfit = acceptanceUsdt - initialUsdt;
       const violationPenalty = parseFloat(t.violation_penalty) || 0;
+      
+      const projectedSettlement = initialUsdt - commission - transferFee;
+      const acceptanceUsdt = parseFloat(t.acceptance_usdt) > 0 ? parseFloat(t.acceptance_usdt) : projectedSettlement;
+      
+      const tradeProfit = initialUsdt - acceptanceUsdt;
+      const exchangeRateProfit = tradeProfit - commission - transferFee + violationPenalty;
 
       estimatedCommission += commission;
       estimatedTransferFee += transferFee;
