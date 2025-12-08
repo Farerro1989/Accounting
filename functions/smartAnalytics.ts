@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.5.0';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
 
 // 智能分析引擎
 Deno.serve(async (req) => {
@@ -68,9 +68,27 @@ function analyzeProfitTrend(transactions, dateRange) {
   
   for (const [date, dayTransactions] of Object.entries(groupedByDate)) {
     const dayProfit = dayTransactions.reduce((total, t) => {
-      const commission = (t.deposit_amount / t.exchange_rate) * (t.commission_percentage / 100);
-      const exchangeProfit = (t.acceptance_usdt || 0) - (t.settlement_usdt || 0) - commission - (t.transfer_fee || 0);
-      return total + commission + exchangeProfit;
+      if (!t.exchange_rate || t.exchange_rate === 0) return total;
+      
+      const initialUsdt = t.deposit_amount / t.exchange_rate;
+      const commission = initialUsdt * (t.commission_percentage / 100);
+      const feeUsdt = (t.transfer_fee || 0) / t.exchange_rate;
+      
+      // Exchange Profit = Acceptance - Initial
+      const acceptance = t.acceptance_usdt || 0;
+      // If acceptance is 0, we can assume break even on exchange profit (Acceptance = Initial)? 
+      // Or use settlement as fallback like dashboard?
+      // Dashboard uses: actualAcceptance = acceptance > 0 ? acceptance : settlementUsdt
+      const settlementUsdt = t.settlement_usdt || 0;
+      const actualAcceptance = acceptance > 0 ? acceptance : settlementUsdt;
+      
+      const exchangeProfit = actualAcceptance - initialUsdt;
+      const penalty = t.violation_penalty || 0;
+
+      // Total Profit = Comm + Fee + ExchangeProfit - Penalty
+      const transactionProfit = commission + feeUsdt + exchangeProfit - penalty;
+      
+      return total + transactionProfit;
     }, 0);
     
     trendData.push({
@@ -109,11 +127,20 @@ function analyzeCurrencyPerformance(transactions) {
     stats.amount += t.deposit_amount || 0;
     stats.rates.push(t.exchange_rate);
     
-    if (t.fund_status === '已完成交易') {
+    if (t.fund_status === '已完成交易' && t.exchange_rate > 0) {
       stats.completedCount++;
-      const commission = (t.deposit_amount / t.exchange_rate) * (t.commission_percentage / 100);
-      const exchangeProfit = (t.acceptance_usdt || 0) - (t.settlement_usdt || 0) - commission - (t.transfer_fee || 0);
-      stats.profit += commission + exchangeProfit;
+      const initialUsdt = t.deposit_amount / t.exchange_rate;
+      const commission = initialUsdt * (t.commission_percentage / 100);
+      const feeUsdt = (t.transfer_fee || 0) / t.exchange_rate;
+      
+      const acceptance = t.acceptance_usdt || 0;
+      const settlementUsdt = t.settlement_usdt || 0;
+      const actualAcceptance = acceptance > 0 ? acceptance : settlementUsdt;
+      
+      const exchangeProfit = actualAcceptance - initialUsdt;
+      const penalty = t.violation_penalty || 0;
+      
+      stats.profit += (commission + feeUsdt + exchangeProfit - penalty);
     }
   });
   
