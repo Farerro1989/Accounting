@@ -106,7 +106,7 @@ async function analyzeImageContent(base44, imageUrl) {
 
 如果是【证件照片】(如护照、身份证、驾照)：
 - 提取姓名 (name)
-- 提取年龄 (age) - 必须根据证件上的【出生日期】推算：当前年份(${currentYear}) 减去 出生年份。例如1950年出生，则年龄为 ${currentYear}-1950。
+- 提取出生日期 (birth_date) - 格式 YYYY-MM-DD 或 YYYY
 - 提取国籍 (nationality)
 
 如果是【银行转账单】：
@@ -129,7 +129,7 @@ async function analyzeImageContent(base44, imageUrl) {
           },
           // 证件字段
           name: { type: "string", description: "证件姓名" },
-          age: { type: "number", description: "年龄" },
+          birth_date: { type: "string", description: "出生日期" },
           nationality: { type: "string", description: "国籍" },
           // 水单字段
           amount: { type: "number" },
@@ -524,7 +524,13 @@ Deno.serve(async (req) => {
           if (type === 'id_card') {
             idCardPhotoUrl = imageUrl;
             if (analysis.data.name) extractedCustomerName = analysis.data.name;
-            if (analysis.data.age) extractedAge = analysis.data.age;
+            if (analysis.data.birth_date) {
+              // 计算年龄
+              const birthYear = parseInt(analysis.data.birth_date.substring(0, 4));
+              if (!isNaN(birthYear)) {
+                extractedAge = new Date().getFullYear() - birthYear;
+              }
+            }
             if (analysis.data.nationality) extractedNationality = analysis.data.nationality;
           } else if (type === 'transfer_receipt') {
             transferReceiptUrl = imageUrl;

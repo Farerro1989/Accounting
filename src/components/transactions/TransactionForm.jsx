@@ -359,13 +359,21 @@ ${transferInfo}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="customer_age">年龄</Label>
-                  <Input
-                    id="customer_age"
-                    type="number"
-                    value={formData.customer_age || ''}
-                    onChange={(e) => handleChange('customer_age', e.target.value)}
-                    className="bg-white/80"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="customer_age"
+                      type="number"
+                      value={formData.customer_age || ''}
+                      onChange={(e) => handleChange('customer_age', e.target.value)}
+                      className={`bg-white/80 ${formData.customer_age >= 70 ? 'border-red-500 text-red-600 font-bold' : ''}`}
+                    />
+                    {formData.customer_age >= 70 && (
+                      <div className="absolute -top-8 right-0 bg-red-100 text-red-600 text-xs px-2 py-1 rounded font-bold border border-red-200 animate-pulse flex items-center">
+                        <AlertCircle className="w-3 h-3 mr-1" />
+                        高龄客户提醒
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
