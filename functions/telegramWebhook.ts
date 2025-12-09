@@ -286,15 +286,15 @@ function parseWaterSlip(text) {
       if (match) data.customer_name = match[1].trim();
     }
     
-    // 5. 收款账户名/入款账户名
-    else if (/(?:收款\s*账户名|公司\s*入款\s*账户名|入款\s*公司名|入款\s*账户名)\s*[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/(?:收款\s*账户名|公司\s*入款\s*账户名|入款\s*公司名|入款\s*账户名).*?[：:：=]\s*(.+)/);
+    // 5. 收款账户名/入款账户名 (扩展匹配: 收款人, 收款方, 公司名, 户名)
+    else if (/(?:收款|入款|公司|账户)\s*(?:账户名|户名|名称|名|人|方)\s*[：:：=]/.test(trimmed) && !/汇款|客户/.test(trimmed)) {
+      const match = trimmed.match(/(?:收款|入款|公司|账户)\s*(?:账户名|户名|名称|名|人|方).*?[：:：=]\s*(.+)/);
       if (match) data.receiving_account_name = match[1].trim();
     }
     
-    // 6. 收款账户/入款账户号
-    else if (/(?:收款\s*账户|入款\s*账户号|收款\s*公司\s*账号|入款\s*账号)\s*[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/(?:收款\s*账户|入款\s*账户号|收款\s*公司\s*账号|入款\s*账号).*?[：:：=]\s*([A-Z0-9\s]+)/i);
+    // 6. 收款账户/入款账户号 (扩展匹配: 账号, 卡号, 账户号)
+    else if (/(?:收款|入款|公司|账户|银行)\s*(?:账号|账户号|卡号|号码)\s*[：:：=]/.test(trimmed) && !/汇款|客户/.test(trimmed)) {
+      const match = trimmed.match(/(?:收款|入款|公司|账户|银行)\s*(?:账号|账户号|卡号|号码).*?[：:：=]\s*([A-Z0-9\s-]+)/i);
       if (match) data.receiving_account_number = match[1].trim();
     }
     
