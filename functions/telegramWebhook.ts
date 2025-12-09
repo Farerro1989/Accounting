@@ -59,6 +59,7 @@ async function downloadTelegramFile(fileId) {
 
 // LLM分析文档 (PDF/Word)
 async function analyzeDocument(base44, docUrl) {
+  const currentYear = new Date().getFullYear();
   try {
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: `请分析这份文档，提取转账水单信息。如果是水单，请提取以下字段并返回JSON：
@@ -96,6 +97,7 @@ async function analyzeDocument(base44, docUrl) {
 
 // 智能图片内容分析 (支持水单和证件)
 async function analyzeImageContent(base44, imageUrl) {
+  const currentYear = new Date().getFullYear();
   try {
     console.log('🔍 开始智能分析图片内容...', imageUrl);
     
@@ -104,7 +106,7 @@ async function analyzeImageContent(base44, imageUrl) {
 
 如果是【证件照片】(如护照、身份证、驾照)：
 - 提取姓名 (name)
-- 提取年龄 (age) - 如果有出生日期，请计算当前年龄（整数）
+- 提取年龄 (age) - 必须根据证件上的【出生日期】推算：当前年份(${currentYear}) 减去 出生年份。例如1950年出生，则年龄为 ${currentYear}-1950。
 - 提取国籍 (nationality)
 
 如果是【银行转账单】：
@@ -695,7 +697,12 @@ Deno.serve(async (req) => {
       successMsg += `💵 查收金额: ${transaction.deposit_amount.toLocaleString()} ${transaction.currency}\n`;
       successMsg += `🔢 汇款笔数: ${transaction.remittance_count || 1}笔\n`;
       successMsg += `👤 汇款人: ${transaction.customer_name}`;
-      if (transaction.customer_age) successMsg += ` (${transaction.customer_age}岁)`;
+      if (transaction.customer_age) {
+        successMsg += ` (${transaction.customer_age}岁)`;
+        if (transaction.customer_age >= 70) {
+          successMsg += ` ⚠️⚠️⚠️ <b>高龄客户提醒</b> ⚠️⚠️⚠️`;
+        }
+      }
       if (transaction.customer_nationality) successMsg += ` [${transaction.customer_nationality}]`;
       successMsg += `\n`;
       successMsg += `🏢 收款账户名: ${transaction.receiving_account_name}\n`;

@@ -371,20 +371,7 @@ ${transferInfo}
 
               <div className="space-y-2">
                 <Label htmlFor="receiving_account_name">入款账户名（收款公司名） *</Label>
-                {Object.keys(companyAccounts).length > 0 ? (
-                  <Select value={formData.receiving_account_name} onValueChange={handleCompanyChange}>
-                    <SelectTrigger className="bg-white/80">
-                      <SelectValue placeholder="选择公司名或输入新公司" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.keys(companyAccounts).map((company) => (
-                        <SelectItem key={company} value={company}>
-                          {company} ({companyAccounts[company].length} 个账户)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
+                <div className="flex gap-2">
                   <Input
                     id="receiving_account_name"
                     value={formData.receiving_account_name}
@@ -393,25 +380,40 @@ ${transferInfo}
                     className="bg-white/80"
                     placeholder="例如: ABC Company Ltd"
                   />
-                )}
-                <Input
-                  value={formData.receiving_account_name}
-                  onChange={(e) => handleChange('receiving_account_name', e.target.value)}
-                  className="bg-white/80 text-sm"
-                  placeholder="或手动输入新公司名"
-                />
+                  {Object.keys(companyAccounts).length > 0 && (
+                    <Select onValueChange={handleCompanyChange}>
+                      <SelectTrigger className="w-[40px] px-0 justify-center bg-white/80" aria-label="选择常用公司">
+                        <span className="sr-only">选择</span>
+                        <div className="h-4 w-4 opacity-50">▼</div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(companyAccounts).map((company) => (
+                          <SelectItem key={company} value={company}>
+                            {company}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="receiving_account_number">入款账户号（收款公司账号） *</Label>
-                {availableAccounts.length > 0 ? (
-                  <>
-                    <Select 
-                      value={formData.receiving_account_number} 
-                      onValueChange={(value) => handleChange('receiving_account_number', value)}
-                    >
-                      <SelectTrigger className="bg-white/80">
-                        <SelectValue placeholder="选择账号或输入新账号" />
+                <div className="flex gap-2">
+                  <Input
+                    id="receiving_account_number"
+                    value={formData.receiving_account_number}
+                    onChange={(e) => handleChange('receiving_account_number', e.target.value)}
+                    required
+                    className="bg-white/80"
+                    placeholder="例如: DE89370400440532013000"
+                  />
+                  {availableAccounts.length > 0 && (
+                    <Select onValueChange={(value) => handleChange('receiving_account_number', value)}>
+                      <SelectTrigger className="w-[40px] px-0 justify-center bg-white/80" aria-label="选择常用账号">
+                        <span className="sr-only">选择</span>
+                        <div className="h-4 w-4 opacity-50">▼</div>
                       </SelectTrigger>
                       <SelectContent>
                         {availableAccounts.map((account) => (
@@ -421,23 +423,8 @@ ${transferInfo}
                         ))}
                       </SelectContent>
                     </Select>
-                    <Input
-                      value={formData.receiving_account_number}
-                      onChange={(e) => handleChange('receiving_account_number', e.target.value)}
-                      className="bg-white/80 text-sm"
-                      placeholder="或手动输入新账号"
-                    />
-                  </>
-                ) : (
-                  <Input
-                    id="receiving_account_number"
-                    value={formData.receiving_account_number}
-                    onChange={(e) => handleChange('receiving_account_number', e.target.value)}
-                    required
-                    className="bg-white/80"
-                    placeholder="例如: DE89370400440532013000"
-                  />
-                )}
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
