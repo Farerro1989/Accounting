@@ -105,6 +105,7 @@ async function analyzeImageContent(base44, imageUrl) {
 如果是【证件照片】(如护照、身份证、驾照)：
 - 提取姓名 (name)
 - 提取年龄 (age) - 如果有出生日期，请计算当前年龄（整数）
+- 提取国籍 (nationality)
 
 如果是【银行转账单】：
 - 提取转账金额 (amount) - 纯数字
@@ -127,6 +128,7 @@ async function analyzeImageContent(base44, imageUrl) {
           // 证件字段
           name: { type: "string", description: "证件姓名" },
           age: { type: "number", description: "年龄" },
+          nationality: { type: "string", description: "国籍" },
           // 水单字段
           amount: { type: "number" },
           currency: { type: "string" },
@@ -410,8 +412,11 @@ async function createTransaction(base44, data, chatId, messageId, idCardPhotoUrl
     deposit_date: data.deposit_date || new Date().toISOString().split('T')[0],
     maintenance_days: maintenanceDays,
     maintenance_end_date: maintenanceEndDate.toISOString().split('T')[0],
-    exchange_rate: data.exchange_rate || 0.95, // Default if not parsed by AI or text
-    commission_percentage: data.commission_percentage || 11, // Default if not parsed by AI or text
+    exchange_rate: data.exchange_rate || 0.95,
+    commission_percentage: data.commission_percentage || 13.5, // Updated default to 13.5
+    calculation_mode: data.calculation_mode || '进算',
+    remittance_count: data.remittance_count || 1,
+    customer_nationality: data.customer_nationality || '',
     transfer_fee: 25,
     violation_penalty: 0,
     fund_status: '等待中',
@@ -472,6 +477,7 @@ Deno.serve(async (req) => {
     let transferData = null;
     let extractedCustomerName = '';
     let extractedAge = null;
+    let extractedNationality = '';
 
     for (let i = 0; i < photos.length; i++) {
       try {
@@ -495,6 +501,7 @@ Deno.serve(async (req) => {
             idCardPhotoUrl = imageUrl;
             if (analysis.data.name) extractedCustomerName = analysis.data.name;
             if (analysis.data.age) extractedAge = analysis.data.age;
+            if (analysis.data.nationality) extractedNationality = analysis.data.nationality;
           } else if (type === 'transfer_receipt') {
             transferReceiptUrl = imageUrl;
             // 如果已经有transferData，可能保留第一个或合并，这里简单保留
@@ -604,6 +611,13 @@ Deno.serve(async (req) => {
     let textData = parseWaterSlip(messageText);
     
     // 如果正则解析缺少关键信息且有足够文本长度，尝试LLM分析文本
+    // 尝试解析文本中的新字段（国籍、笔数、计算方式）
+    if (/国籍[：:：]\s*(.+)/.test(messageText)) textData.customer_nationality = messageText.match(/国籍[：:：]\s*(.+)/)[1].trim();
+    if (/(?:汇款笔数|笔数)[：:：]\s*(\d+)/.test(messageText)) textData.remittance_count = parseInt(messageText.match(/(?:汇款笔数|笔数)[：:：]\s*(\d+)/)[1]);
+    if (/(?:进算|拖算)/.test(messageText)) {
+      textData.calculation_mode = messageText.includes('拖算') ? '拖算' : '进算';
+    }
+
     if ((!textData.deposit_amount || !textData.currency) && messageText.length > 10) {
       console.log('🤔 正则解析不完整，尝试LLM分析文本...');
       const llmTextData = await analyzeText(base44, messageText);
@@ -611,7 +625,6 @@ Deno.serve(async (req) => {
         console.log('🤖 LLM文本分析结果:', llmTextData);
         // 合并LLM结果 (LLM结果优先于正则，因为更智能)
         textData = { ...textData, ...llmTextData };
-        // 特殊处理：如果LLM返回了currency code (如CNY)，parseWaterSlip可能没处理，需要mergeData再次映射
       }
     }
 
@@ -622,10 +635,18 @@ Deno.serve(async (req) => {
     
     // 注入证件提取的信息
     if (extractedCustomerName) {
+      // 如果水单也有名字，可以进行比对（这里简单覆盖或做记录）
+      if (mergedData.customer_name && mergedData.customer_name !== extractedCustomerName) {
+        console.warn(`⚠️ 姓名不匹配: 证件(${extractedCustomerName}) vs 水单(${mergedData.customer_name})`);
+        // 优先使用证件姓名，因为它通常更准确
+      }
       mergedData.customer_name = extractedCustomerName;
     }
     if (extractedAge) {
       mergedData.customer_age = extractedAge;
+    }
+    if (extractedNationality) {
+      mergedData.customer_nationality = extractedNationality;
     }
     
     console.log('📊 合并后数据:', mergedData);

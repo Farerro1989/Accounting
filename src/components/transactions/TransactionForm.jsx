@@ -26,14 +26,18 @@ const FUND_STATUSES = [
 export default function TransactionForm({ transaction, initialTransferInfo = "", onSubmit, onCancel }) {
   const [formData, setFormData] = useState(transaction || {
     customer_name: "",
+    customer_age: "",
+    customer_nationality: "",
     receiving_account_name: "",
     receiving_account_number: "",
     currency: "",
     deposit_amount: 0,
+    remittance_count: 1,
     deposit_date: format(new Date(), "yyyy-MM-dd"),
     maintenance_days: 15,
     exchange_rate: 0.96,
     commission_percentage: 13.5,
+    calculation_mode: "进算",
     transfer_fee: 25,
     violation_penalty: 0,
     fund_status: "等待中",
@@ -342,6 +346,29 @@ ${transferInfo}
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="customer_nationality">国籍</Label>
+                  <Input
+                    id="customer_nationality"
+                    value={formData.customer_nationality || ''}
+                    onChange={(e) => handleChange('customer_nationality', e.target.value)}
+                    className="bg-white/80"
+                    placeholder="例：中国"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="customer_age">年龄</Label>
+                  <Input
+                    id="customer_age"
+                    type="number"
+                    value={formData.customer_age || ''}
+                    onChange={(e) => handleChange('customer_age', e.target.value)}
+                    className="bg-white/80"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="receiving_account_name">入款账户名（收款公司名） *</Label>
                 {Object.keys(companyAccounts).length > 0 ? (
@@ -413,17 +440,30 @@ ${transferInfo}
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="deposit_amount">查收金额 *</Label>
-                <Input
-                  id="deposit_amount"
-                  type="number"
-                  step="0.01"
-                  value={formData.deposit_amount}
-                  onChange={(e) => handleChange('deposit_amount', parseFloat(e.target.value) || 0)}
-                  required
-                  className="bg-white/80"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="deposit_amount">查收金额 *</Label>
+                  <Input
+                    id="deposit_amount"
+                    type="number"
+                    step="0.01"
+                    value={formData.deposit_amount}
+                    onChange={(e) => handleChange('deposit_amount', parseFloat(e.target.value) || 0)}
+                    required
+                    className="bg-white/80"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="remittance_count">汇款笔数</Label>
+                  <Input
+                    id="remittance_count"
+                    type="number"
+                    min="1"
+                    value={formData.remittance_count || 1}
+                    onChange={(e) => handleChange('remittance_count', parseInt(e.target.value) || 1)}
+                    className="bg-white/80"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -444,17 +484,34 @@ ${transferInfo}
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="commission_percentage">佣金% * (默认13.5%)</Label>
-                <Input
-                  id="commission_percentage"
-                  type="number"
-                  step="0.01"
-                  value={formData.commission_percentage}
-                  onChange={(e) => handleChange('commission_percentage', parseFloat(e.target.value) || 0)}
-                  required
-                  className="bg-white/80"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="commission_percentage">点位 (佣金%) *</Label>
+                  <Input
+                    id="commission_percentage"
+                    type="number"
+                    step="0.01"
+                    value={formData.commission_percentage}
+                    onChange={(e) => handleChange('commission_percentage', parseFloat(e.target.value) || 0)}
+                    required
+                    className="bg-white/80"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>进算/拖算</Label>
+                  <Select 
+                    value={formData.calculation_mode || '进算'} 
+                    onValueChange={(value) => handleChange('calculation_mode', value)}
+                  >
+                    <SelectTrigger className="bg-white/80">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="进算">进算</SelectItem>
+                      <SelectItem value="拖算">拖算</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <div className="space-y-2">
