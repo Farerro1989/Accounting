@@ -855,12 +855,6 @@ Deno.serve(async (req) => {
     }
 
     // 4. 检查是否需要继续处理为交易
-    // 如果是 Media Group 的一部分，跳过自动处理，等待 /process_batch
-    if (mediaGroupId) {
-       console.log('⏳ 收到 Media Group 消息，跳过自动处理，等待指令。');
-       // 可选：发送提示 (为了不刷屏，这里不发，或者只对第一条发? 很难判断第一条)
-       return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    }
 
     // 必须有图片或文本
     // 必须有图片或文本
