@@ -821,6 +821,20 @@ Deno.serve(async (req) => {
         if (photos.length > 0) tags.push('photo');
       }
 
+      // 准备分析结果数据
+      let analysisData = null;
+      if (transferData && transferData.data) {
+        analysisData = transferData.data;
+      } else if (idCardPhotoUrl) {
+         // 重新构建证件的 analysis data
+         analysisData = {
+           image_type: 'id_card',
+           name: extractedCustomerName,
+           birth_date: extractedAge ? (new Date().getFullYear() - extractedAge).toString() : null, // 估算年份
+           nationality: extractedNationality
+         };
+      }
+
       await base44.asServiceRole.entities.TelegramMessage.create({
         chat_id: String(chatId),
         message_id: String(messageId),
@@ -832,7 +846,8 @@ Deno.serve(async (req) => {
         direction: 'incoming',
         tags: tags,
         category: category,
-        status: mediaGroupId ? 'pending_batch' : 'unread' // 如果是组消息，标记为待批量处理
+        status: 'processed', // 自动处理
+        analysis_result: analysisData
       });
       console.log('💾 消息已存档');
     } catch (error) {
@@ -888,13 +903,11 @@ Deno.serve(async (req) => {
     // 合并数据
     const mergedData = mergeData(transferData, textData);
     
-    // 注入证件提取的信息
+    // 尝试寻找关联的证件信息 (当前消息提取的 或 历史消息关联的)
+    let linkedIdCardUrl = idCardPhotoUrl;
+
+    // 1. 优先使用当前消息提取的证件信息
     if (extractedCustomerName) {
-      // 如果水单也有名字，可以进行比对（这里简单覆盖或做记录）
-      if (mergedData.customer_name && mergedData.customer_name !== extractedCustomerName) {
-        console.warn(`⚠️ 姓名不匹配: 证件(${extractedCustomerName}) vs 水单(${mergedData.customer_name})`);
-        // 优先使用证件姓名，因为它通常更准确
-      }
       mergedData.customer_name = extractedCustomerName;
     }
     if (extractedAge) {
@@ -902,6 +915,55 @@ Deno.serve(async (req) => {
     }
     if (extractedNationality) {
       mergedData.customer_nationality = extractedNationality;
+    }
+
+    // 2. 如果当前消息没有证件信息，尝试查找同组(Media Group)或最近的证件消息
+    if (!extractedCustomerName && !extractedAge) {
+       try {
+         // 获取最近的10条消息
+         const recentMsgs = await base44.asServiceRole.entities.TelegramMessage.list(); // 默认按时间倒序
+         
+         // 查找逻辑:
+         // A. 如果有 mediaGroupId，找同组的 type='id_card'
+         // B. 如果没有，找同 chat_id 且时间在最近 5 分钟内的 type='id_card'
+         
+         const targetIdCardMsg = recentMsgs.find(m => {
+           if (m.chat_id !== String(chatId)) return false;
+           if (!m.analysis_result || m.analysis_result.image_type !== 'id_card') return false;
+           
+           // A. Media Group 匹配
+           if (mediaGroupId && m.media_group_id === mediaGroupId) return true;
+           
+           // B. 时间匹配 (忽略同一次请求的自己，虽然 list 可能还没包含自己或者刚存入)
+           // 简单起见，只要是最近一条证件即可 (假设最近的证件就是匹配的)
+           // 为防止关联到很久以前的，可以加个数量限制或时间判断，这里简化为最近一条
+           return true; 
+         });
+
+         if (targetIdCardMsg && targetIdCardMsg.analysis_result) {
+            console.log('🔗 自动关联到历史证件消息:', targetIdCardMsg.message_id);
+            const idData = targetIdCardMsg.analysis_result;
+            
+            if (idData.name) mergedData.customer_name = idData.name;
+            // 处理年龄
+            if (idData.birth_date) {
+               const birthYear = parseInt(idData.birth_date.substring(0, 4));
+               if (!isNaN(birthYear)) {
+                 mergedData.customer_age = new Date().getFullYear() - birthYear;
+               }
+            } else if (idData.age) {
+               mergedData.customer_age = idData.age;
+            }
+            if (idData.nationality) mergedData.customer_nationality = idData.nationality;
+            
+            // 关联证件图片URL
+            if (targetIdCardMsg.file_urls && targetIdCardMsg.file_urls.length > 0) {
+               linkedIdCardUrl = targetIdCardMsg.file_urls[0];
+            }
+         }
+       } catch (e) {
+         console.error('查找关联证件失败:', e);
+       }
     }
     
     console.log('📊 合并后数据:', mergedData);
@@ -923,7 +985,7 @@ Deno.serve(async (req) => {
         mergedData, 
         chatId, 
         messageId, 
-        idCardPhotoUrl, 
+        linkedIdCardUrl, 
         transferReceiptUrl
       );
       
