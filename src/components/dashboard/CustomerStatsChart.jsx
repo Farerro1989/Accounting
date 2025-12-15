@@ -9,6 +9,9 @@ export default function CustomerStatsChart({ transactions }) {
     const currencyData = {};
 
     transactions.forEach(t => {
+      // Exclude Returned and Frozen funds from stats
+      if (t.fund_status === '已退回' || t.fund_status === '冻结（不能处理）') return;
+
       // Customer stats (Top customers by USDT volume)
       const depositAmount = parseFloat(t.deposit_amount) || 0;
       const exchangeRate = parseFloat(t.exchange_rate) || 1; // Avoid division by zero
