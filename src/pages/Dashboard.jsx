@@ -339,14 +339,14 @@ export default function Dashboard() {
 
   // 统计各个入款账户（按公司+币种分类）
   const accountStats = React.useMemo(() => {
-    const filteredTxns = getFilteredTransactions();
-    const stats = {};
+  const filteredTxns = getFilteredTransactions();
+  const stats = {};
 
-    filteredTxns.forEach(t => {
-      // 已退回的资金不计入账户统计
-      if (t.fund_status === '已退回') return;
+  filteredTxns.forEach(t => {
+    // 已退回的资金和冻结（不能处理）不计入账户统计
+    if (t.fund_status === '已退回' || t.fund_status === '冻结（不能处理）') return;
 
-      const company = t.receiving_account_name || '未知公司';
+    const company = t.receiving_account_name || '未知公司';
       const currency = t.currency?.substring(0, 3) || 'XXX';
       const account = t.receiving_account_number || '未知账户';
 
