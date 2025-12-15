@@ -149,8 +149,8 @@ export default function Dashboard() {
     const allFilteredTransactions = getFilteredTransactions();
     
     const depositsByCurrency = allFilteredTransactions.reduce((acc, t) => {
-      // 已退回的资金不计入总账目
-      if (t.fund_status === '已退回') return acc;
+      // 已退回的资金和冻结（不能处理）不计入总账目
+      if (t.fund_status === '已退回' || t.fund_status === '冻结（不能处理）') return acc;
 
       const currencyCode = t.currency?.replace(/[\u4e00-\u9fa5]/g, '') || 'OTHER';
       if (!acc[currencyCode]) {
