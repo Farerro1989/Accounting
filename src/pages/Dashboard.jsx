@@ -237,6 +237,7 @@ export default function Dashboard() {
     let estimatedExchangeRateProfit = 0;
     let estimatedViolationPenalty = 0;
     let estimatedCount = 0;
+    let totalFrozenFunds = 0; // 新增：冻结资金总额
 
     for (const t of filteredTransactions) {
       const depositAmount = parseFloat(t.deposit_amount);
@@ -277,6 +278,13 @@ export default function Dashboard() {
       estimatedExchangeRateProfit += estimatedExchangeProfit;
       estimatedViolationPenalty += violationPenalty;
       estimatedCount++;
+      
+      // 统计冻结资金 (冻结（不能处理）)
+      if (t.fund_status === '冻结（不能处理）') {
+        // 计算冻结资金的USDT价值 (Deposit / Rate)
+        const frozenUsdt = depositAmount / exchangeRate;
+        totalFrozenFunds += frozenUsdt;
+      }
     }
 
     const estimatedProfit = estimatedCommission + estimatedTransferFee + estimatedExchangeRateProfit - estimatedViolationPenalty;
@@ -286,6 +294,7 @@ export default function Dashboard() {
       transferFee: totalTransferFee,
       exchangeRateProfit: totalExchangeRateProfit,
       violationPenalty: totalViolationPenalty,
+      frozenFunds: totalFrozenFunds, // 返回冻结资金
       profit: totalProfit,
       completedCount: completedCount,
       

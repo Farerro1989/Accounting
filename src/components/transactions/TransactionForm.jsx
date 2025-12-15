@@ -103,10 +103,13 @@ export default function TransactionForm({ transaction, initialTransferInfo = "",
     const netNative = deposit - fee - commAmount;
     const settlementUsdt = rate > 0 ? (netNative / rate) : 0;
 
+    // 如果资金状态是"冻结（不能处理）"，则不需要结算，结算金额设为0
+    const finalSettlementUsdt = formData.fund_status === "冻结（不能处理）" ? 0 : settlementUsdt;
+
     const dataWithMaintenance = {
       ...formData,
       maintenance_end_date: format(maintenanceEndDate, "yyyy-MM-dd"),
-      settlement_usdt: parseFloat(settlementUsdt.toFixed(2))
+      settlement_usdt: parseFloat(finalSettlementUsdt.toFixed(2))
     };
 
     onSubmit(dataWithMaintenance);
