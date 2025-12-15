@@ -110,6 +110,8 @@ export default function TransactionForm({ transaction, initialTransferInfo = "",
 
     if (formData.fund_status === "冻结（不能处理）") {
       finalSettlementUsdt = 0;
+      finalCommission = 0;
+      finalFee = 0;
     } else if (formData.fund_status === "已退回") {
       finalSettlementUsdt = 0;
       finalCommission = 0;

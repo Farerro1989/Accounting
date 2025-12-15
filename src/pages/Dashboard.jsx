@@ -194,6 +194,16 @@ export default function Dashboard() {
 
       const depositAmount = parseFloat(t.deposit_amount);
       const exchangeRate = parseFloat(t.exchange_rate);
+
+      // Handle Frozen (Cannot Process)
+      // Logic: Ignore deposit, settlement, commission, fee, penalty. Only track Frozen Funds.
+      if (t.fund_status === '冻结（不能处理）') {
+        if (depositAmount && exchangeRate && exchangeRate !== 0) {
+          totalFrozenFunds += depositAmount / exchangeRate;
+        }
+        continue; // Skip all profit/commission/fee calculations
+      }
+
       const violationPenalty = parseFloat(t.violation_penalty) || 0;
 
       // 1. Violation Penalty counts for ALL valid transactions (Actual Revenue)
@@ -215,9 +225,6 @@ export default function Dashboard() {
       // Settlement (Theoretical)
       const netNative = depositAmount - feeNative - commNative;
       let settlementUsdt = netNative / exchangeRate;
-      if (t.fund_status === '冻结（不能处理）') {
-        settlementUsdt = 0;
-      }
 
       // --- ACTUAL PROFIT (Only Completed) ---
       if (t.fund_status === '已完成交易') {
@@ -231,7 +238,7 @@ export default function Dashboard() {
         completedCount++;
       }
 
-      // --- ESTIMATED PROFIT (All Valid) ---
+      // --- ESTIMATED PROFIT (All Valid, Excluding Frozen/Returned) ---
       const acceptanceUsdt = parseFloat(t.acceptance_usdt) || 0;
       const estimatedAcceptance = acceptanceUsdt > 0 ? acceptanceUsdt : (settlementUsdt + commissionUsdt + feeUsdt);
       const estimatedExchangeProfit = estimatedAcceptance - initialUsdt;
@@ -240,11 +247,6 @@ export default function Dashboard() {
       estimatedTransferFee += feeUsdt;
       estimatedExchangeRateProfit += estimatedExchangeProfit;
       estimatedCount++;
-
-      // --- FROZEN FUNDS ---
-      if (t.fund_status === '冻结（不能处理）') {
-        totalFrozenFunds += initialUsdt;
-      }
     }
 
     // Total Profit includes Violation Penalty
