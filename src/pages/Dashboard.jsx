@@ -149,6 +149,9 @@ export default function Dashboard() {
     const allFilteredTransactions = getFilteredTransactions();
     
     const depositsByCurrency = allFilteredTransactions.reduce((acc, t) => {
+      // 已退回的资金不计入总账目
+      if (t.fund_status === '已退回') return acc;
+
       const currencyCode = t.currency?.replace(/[\u4e00-\u9fa5]/g, '') || 'OTHER';
       if (!acc[currencyCode]) {
         acc[currencyCode] = { amount: 0, count: 0 };
@@ -158,7 +161,10 @@ export default function Dashboard() {
       return acc;
     }, {});
 
-    const totalTransactions = allFilteredTransactions.length;
+    // 总笔数也排除已退回的吗？通常"Total Accounts"指金额。
+    // 但用户说"不能记录进总账目"，为了一致性，这里只统计有效的交易笔数
+    const effectiveTransactions = allFilteredTransactions.filter(t => t.fund_status !== '已退回');
+    const totalTransactions = effectiveTransactions.length;
 
     return {
       depositsByCurrency,
@@ -240,6 +246,9 @@ export default function Dashboard() {
     let totalFrozenFunds = 0; // 新增：冻结资金总额
 
     for (const t of filteredTransactions) {
+      // 已退回的资金不计入预估盈利
+      if (t.fund_status === '已退回') continue;
+
       const depositAmount = parseFloat(t.deposit_amount);
       const exchangeRate = parseFloat(t.exchange_rate);
 
@@ -378,6 +387,9 @@ export default function Dashboard() {
     const stats = {};
 
     filteredTxns.forEach(t => {
+      // 已退回的资金不计入账户统计
+      if (t.fund_status === '已退回') return;
+
       const company = t.receiving_account_name || '未知公司';
       const currency = t.currency?.substring(0, 3) || 'XXX';
       const account = t.receiving_account_number || '未知账户';
