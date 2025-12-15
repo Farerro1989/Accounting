@@ -281,9 +281,9 @@ export default function Dashboard() {
       }
     }
 
-    const totalProfit = totalCommission + totalTransferFee + totalExchangeRateProfit - totalViolationPenalty;
+    const totalProfit = totalCommission + totalTransferFee + totalExchangeRateProfit + totalViolationPenalty;
 
-    const estimatedProfit = estimatedCommission + estimatedTransferFee + estimatedExchangeRateProfit - estimatedViolationPenalty;
+    const estimatedProfit = estimatedCommission + estimatedTransferFee + estimatedExchangeRateProfit + estimatedViolationPenalty;
 
     return {
       commission: totalCommission,
