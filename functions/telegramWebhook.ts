@@ -505,21 +505,36 @@ async function processBatch(base44, chatId) {
     let receiptUrl = '';
     let transactionData = {};
 
-    for (const url of allImages) {
-      // 简单判断文件类型（图片vs文档），这里复用之前的 analyzeImageContent
-      // 如果是文档URL，可能需要 analyzeDocument。为简化，先假设大部分是图片。
-      // 实际应根据 metadata 或 url 后缀判断，但 telegram file path 不一定有后缀。
+    // 并行分析所有文件
+    const analysisPromises = allImages.map(async (url) => {
       // 尝试作为图片分析
       const analysis = await analyzeImageContent(base44, url);
-      
       if (analysis && analysis.data) {
-        const type = analysis.data.image_type;
+        return { type: 'image', url, result: analysis };
+      }
+      
+      // 尝试文档分析
+      const docAnalysis = await analyzeDocument(base44, url);
+      if (docAnalysis && docAnalysis.data) {
+        return { type: 'document', url, result: docAnalysis };
+      }
+      
+      return null;
+    });
+
+    const analysisResults = await Promise.all(analysisPromises);
+
+    for (const item of analysisResults) {
+      if (!item) continue;
+      const { url, result } = item;
+      
+      if (item.type === 'image') {
+        const type = result.data.image_type;
         console.log(`🖼️ [批量] 识别结果: ${type} (${url})`);
 
         if (type === 'id_card') {
-          idCardData = analysis.data;
+          idCardData = result.data;
           idCardUrl = url;
-          // 计算年龄
           if (idCardData.birth_date) {
              const birthYear = parseInt(idCardData.birth_date.substring(0, 4));
              if (!isNaN(birthYear)) {
@@ -527,28 +542,21 @@ async function processBatch(base44, chatId) {
              }
           }
         } else if (type === 'transfer_receipt') {
-          // 如果有多张水单，目前逻辑是覆盖或保留第一张。
-          // 既然是"关联"，假设是一对一。
           if (!receiptData) {
-            receiptData = analysis.data;
+            receiptData = result.data;
             receiptUrl = url;
           }
         } else {
-          // 如果未识别出类型，若还没有水单，暂作水单处理
           if (!receiptData) {
-             receiptData = analysis.data;
+             receiptData = result.data;
              receiptUrl = url;
           }
         }
-      } else {
-        // 尝试文档分析
-        const docAnalysis = await analyzeDocument(base44, url);
-        if (docAnalysis && docAnalysis.data) {
-           if (!receiptData) {
-             receiptData = docAnalysis.data;
-             receiptUrl = url;
-             console.log(`📄 [批量] 文档识别为水单`);
-           }
+      } else if (item.type === 'document') {
+        if (!receiptData) {
+          receiptData = result.data;
+          receiptUrl = url;
+          console.log(`📄 [批量] 文档识别为水单`);
         }
       }
     }
@@ -724,51 +732,61 @@ Deno.serve(async (req) => {
     let extractedAge = null;
     let extractedNationality = '';
 
-    for (let i = 0; i < photos.length; i++) {
+    // 并行处理所有图片以提升速度
+    const photoProcessingPromises = photos.map(async (photoId) => {
       try {
-        const photoId = photos[i];
         const imageBlob = await downloadTelegramFile(photoId);
         
         const uploadResult = await base44.asServiceRole.integrations.Core.UploadFile({
           file: imageBlob
         });
         const imageUrl = uploadResult.file_url;
-        allFileUrls.push(imageUrl);
         
         // 智能分析图片内容 (区分证件或水单)
         const analysis = await analyzeImageContent(base44, imageUrl);
         
-        if (analysis && analysis.data) {
-          const type = analysis.data.image_type;
-          console.log(`🖼️ 图片识别为: ${type}`);
-          
-          if (type === 'id_card') {
-            idCardPhotoUrl = imageUrl;
-            if (analysis.data.name) extractedCustomerName = analysis.data.name;
-            if (analysis.data.birth_date) {
-              // 计算年龄
-              const birthYear = parseInt(analysis.data.birth_date.substring(0, 4));
-              if (!isNaN(birthYear)) {
-                extractedAge = new Date().getFullYear() - birthYear;
-              }
-            }
-            if (analysis.data.nationality) extractedNationality = analysis.data.nationality;
-          } else if (type === 'transfer_receipt') {
-            transferReceiptUrl = imageUrl;
-            // 如果已经有transferData，可能保留第一个或合并，这里简单保留
-            if (!transferData) {
-               transferData = { imageUrl, data: analysis.data };
-            }
-          } else {
-             // 默认为水单处理，防止漏判
-             if (!transferData) {
-               transferData = { imageUrl, data: analysis.data };
-               transferReceiptUrl = imageUrl;
-             }
-          }
-        }
+        return { imageUrl, analysis };
       } catch (error) {
         console.error('❌ 图片处理失败:', error);
+        return null;
+      }
+    });
+
+    const photoResults = await Promise.all(photoProcessingPromises);
+
+    // 处理分析结果
+    for (const result of photoResults) {
+      if (!result) continue;
+      const { imageUrl, analysis } = result;
+      allFileUrls.push(imageUrl);
+
+      if (analysis && analysis.data) {
+        const type = analysis.data.image_type;
+        console.log(`🖼️ 图片识别为: ${type}`);
+        
+        if (type === 'id_card') {
+          idCardPhotoUrl = imageUrl;
+          if (analysis.data.name) extractedCustomerName = analysis.data.name;
+          if (analysis.data.birth_date) {
+            // 计算年龄
+            const birthYear = parseInt(analysis.data.birth_date.substring(0, 4));
+            if (!isNaN(birthYear)) {
+              extractedAge = new Date().getFullYear() - birthYear;
+            }
+          }
+          if (analysis.data.nationality) extractedNationality = analysis.data.nationality;
+        } else if (type === 'transfer_receipt') {
+          transferReceiptUrl = imageUrl;
+          if (!transferData) {
+             transferData = { imageUrl, data: analysis.data };
+          }
+        } else {
+           // 默认为水单处理，防止漏判
+           if (!transferData) {
+             transferData = { imageUrl, data: analysis.data };
+             transferReceiptUrl = imageUrl;
+           }
+        }
       }
     }
 
