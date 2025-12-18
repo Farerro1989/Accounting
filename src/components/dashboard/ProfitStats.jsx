@@ -33,12 +33,48 @@ export default function ProfitStats({ profitMetrics, permissions, currentUser, t
           {/* Actual Profit */}
           <div className="bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-6 shadow-lg relative overflow-hidden group hover:shadow-xl transition-all">
             <div className="relative z-10">
-              <p className="text-sm font-medium text-purple-900 mb-1">实际盈利 (已完成)</p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-medium text-purple-900">实际盈利 (已完成)</p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="w-4 h-4 text-purple-700/70 hover:text-purple-900 transition-colors" />
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-white/95 backdrop-blur border-purple-200 text-slate-800 p-4 shadow-xl max-w-xs">
+                      <div className="space-y-2">
+                        <p className="font-bold border-b border-purple-100 pb-2 mb-2">计算公式明细</p>
+                        <div className="flex justify-between text-xs">
+                          <span>佣金 (已完成):</span>
+                          <span className="font-mono text-green-600">+{formatCurrency(profitMetrics.commission)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>手续费 (已完成):</span>
+                          <span className="font-mono text-blue-600">+{formatCurrency(profitMetrics.transferFee)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>汇率盈亏 (已完成):</span>
+                          <span className={`font-mono ${profitMetrics.exchangeRateProfit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                            {profitMetrics.exchangeRateProfit >= 0 ? '+' : ''}{formatCurrency(profitMetrics.exchangeRateProfit)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span>违规罚金 (全部):</span>
+                          <span className="font-mono text-red-600">+{formatCurrency(profitMetrics.violationPenalty)}</span>
+                        </div>
+                        <div className="border-t border-purple-100 pt-2 mt-2 flex justify-between font-bold text-sm">
+                          <span>总计:</span>
+                          <span className="text-purple-700">{formatCurrency(profitMetrics.profit)}</span>
+                        </div>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <p className="text-3xl font-bold text-purple-700">
                 {formatCurrency(profitMetrics.profit)} USDT
               </p>
               <p className="text-xs text-purple-600/70 mt-2">
-                基于 {profitMetrics.completedCount} 笔已完成交易
+                基于 {profitMetrics.completedCount} 笔已完成交易 + 所有罚金
               </p>
             </div>
             <div className="absolute right-0 top-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
