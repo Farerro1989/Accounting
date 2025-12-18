@@ -190,26 +190,25 @@ export default function Dashboard() {
     let totalFrozenFunds = 0;
 
     for (const t of filteredTransactions) {
-      // Exclude Returned funds completely
+      // 1. Violation Penalty counts for ALL transactions (including Frozen/Returned)
+      const violationPenalty = parseFloat(t.violation_penalty) || 0;
+      totalViolationPenalty += violationPenalty;
+      estimatedViolationPenalty += violationPenalty;
+
+      // Handle Returned - Skip everything else
       if (t.fund_status === '已退回') continue;
 
       const depositAmount = parseFloat(t.deposit_amount);
       const exchangeRate = parseFloat(t.exchange_rate);
 
       // Handle Frozen (Cannot Process)
-      // Logic: Ignore deposit, settlement, commission, fee, penalty. Only track Frozen Funds.
+      // Logic: Track Frozen Funds, but skip profit/commission/fee calculations
       if (t.fund_status === '冻结（不能处理）') {
         if (depositAmount && exchangeRate && exchangeRate !== 0) {
           totalFrozenFunds += depositAmount / exchangeRate;
         }
-        continue; // Skip all profit/commission/fee calculations
+        continue; 
       }
-
-      const violationPenalty = parseFloat(t.violation_penalty) || 0;
-
-      // 1. Violation Penalty counts for ALL valid transactions (Actual Revenue)
-      totalViolationPenalty += violationPenalty;
-      estimatedViolationPenalty += violationPenalty;
 
       if (!depositAmount || !exchangeRate || exchangeRate === 0) {
         continue;
