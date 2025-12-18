@@ -229,7 +229,8 @@ export default function Dashboard() {
       // --- ACTUAL PROFIT (Only Completed) ---
       if (t.fund_status === '已完成交易') {
         const acceptanceUsdt = parseFloat(t.acceptance_usdt) || 0;
-        const actualAcceptance = acceptanceUsdt > 0 ? acceptanceUsdt : settlementUsdt;
+        // Correct logic: Gross Acceptance (or estimated gross from initial) minus Gross Initial
+        const actualAcceptance = acceptanceUsdt > 0 ? acceptanceUsdt : initialUsdt;
         const exchangeProfit = actualAcceptance - initialUsdt;
 
         totalCommission += commissionUsdt;
