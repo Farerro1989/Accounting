@@ -10,10 +10,10 @@ export default function ProfitReportTable({ transactions }) {
   const [reportType, setReportType] = useState("month"); // month, quarter, year
 
   const reportData = useMemo(() => {
-    const completedTxns = transactions.filter(t => t.fund_status === '已完成交易');
+    // Process ALL transactions to capture penalties from non-completed ones
     const groupedData = {};
 
-    completedTxns.forEach(t => {
+    transactions.forEach(t => {
       if (!t.created_date) return;
       const date = new Date(t.created_date);
       let key;
@@ -45,31 +45,43 @@ export default function ProfitReportTable({ transactions }) {
           commission: 0,
           fees: 0,
           exchangeProfit: 0,
-          totalProfit: 0
+          totalProfit: 0,
+          penalty: 0
         };
       }
 
-      // Calculate metrics (using same logic as ProfitStats)
+      // --- LOGIC MUST MATCH Dashboard.js calculateProfitMetrics ---
+
+      // 1. Violation Penalty (All transactions)
+      const violationPenalty = parseFloat(t.violation_penalty) || 0;
+      groupedData[key].penalty += violationPenalty;
+      groupedData[key].totalProfit += violationPenalty;
+
+      // 2. Exclude Returned Funds completely
+      if (t.fund_status === '已退回') return;
+
       const depositAmount = parseFloat(t.deposit_amount) || 0;
       const exchangeRate = parseFloat(t.exchange_rate) || 0;
-      
-      if (exchangeRate > 0) {
-        const initialUsdt = depositAmount / exchangeRate;
+
+      // 3. Exclude Frozen (Cannot Process) from profit calc (except penalty which is already added)
+      if (t.fund_status === '冻结（不能处理）') return;
+
+      if (exchangeRate <= 0) return;
+
+      // 4. Calculate Profit Components ONLY for Completed Transactions
+      if (t.fund_status === '已完成交易') {
         const feeNative = parseFloat(t.transfer_fee) || 0;
         const commNative = depositAmount * ((parseFloat(t.commission_percentage) || 0) / 100);
-        const violationPenalty = parseFloat(t.violation_penalty) || 0;
-        const acceptanceUsdt = parseFloat(t.acceptance_usdt) || 0;
-
+        
         // USDT conversions
         const commissionUsdt = commNative / exchangeRate;
         const feeUsdt = feeNative / exchangeRate;
-        
-        // Profit logic
-        const netNative = depositAmount - feeNative - commNative;
-        const settlementUsdt = netNative / exchangeRate;
-        const actualAcceptance = acceptanceUsdt > 0 ? acceptanceUsdt : settlementUsdt;
-        const totalTradeProfit = actualAcceptance - settlementUsdt - violationPenalty;
-        
+        const initialUsdt = depositAmount / exchangeRate;
+
+        // Exchange Profit Logic: Actual Acceptance - Initial
+        const acceptanceUsdt = parseFloat(t.acceptance_usdt) || 0;
+        // If acceptance_usdt is 0, assume it equals initialUsdt (no exchange gain/loss)
+        const actualAcceptance = acceptanceUsdt > 0 ? acceptanceUsdt : initialUsdt;
         const exchangeProfit = actualAcceptance - initialUsdt;
 
         // Aggregate
@@ -77,7 +89,9 @@ export default function ProfitReportTable({ transactions }) {
         groupedData[key].commission += commissionUsdt;
         groupedData[key].fees += feeUsdt;
         groupedData[key].exchangeProfit += exchangeProfit;
-        groupedData[key].totalProfit += totalTradeProfit;
+        
+        // Total Profit = Comm + Fee + ExchProfit + Penalty
+        groupedData[key].totalProfit += (commissionUsdt + feeUsdt + exchangeProfit);
       }
     });
 
