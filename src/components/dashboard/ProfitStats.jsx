@@ -132,12 +132,18 @@ export default function ProfitStats({ profitMetrics, permissions, currentUser, t
         {/* Detailed Breakdown */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {canViewCommission && (
-            <div className="bg-yellow-50/50 border border-yellow-100 rounded-lg p-4">
+            <div 
+              className="bg-yellow-50/50 border border-yellow-100 rounded-lg p-4 cursor-pointer hover:bg-yellow-50 transition-colors"
+              onClick={() => navigateToDetails('commission')}
+            >
               <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-yellow-100 rounded-lg">
                   <Coins className="w-4 h-4 text-yellow-600" />
                 </div>
-                <span className="font-medium text-yellow-900">佣金收入</span>
+                <div className="flex items-center gap-1">
+                  <span className="font-medium text-yellow-900">佣金收入</span>
+                  <ChevronRight className="w-3 h-3 text-yellow-600/50" />
+                </div>
               </div>
               <div className="flex justify-between items-end">
                 <div>
@@ -152,12 +158,18 @@ export default function ProfitStats({ profitMetrics, permissions, currentUser, t
             </div>
           )}
 
-          <div className="bg-blue-50/50 border border-blue-100 rounded-lg p-4">
+          <div 
+            className="bg-blue-50/50 border border-blue-100 rounded-lg p-4 cursor-pointer hover:bg-blue-50 transition-colors"
+            onClick={() => navigateToDetails('fee')}
+          >
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-blue-100 rounded-lg">
                 <Calculator className="w-4 h-4 text-blue-600" />
               </div>
-              <span className="font-medium text-blue-900">手续费收入</span>
+              <div className="flex items-center gap-1">
+                <span className="font-medium text-blue-900">手续费收入</span>
+                <ChevronRight className="w-3 h-3 text-blue-600/50" />
+              </div>
             </div>
             <div className="flex justify-between items-end">
               <div>
@@ -171,12 +183,18 @@ export default function ProfitStats({ profitMetrics, permissions, currentUser, t
             </div>
           </div>
 
-          <div className="bg-emerald-50/50 border border-emerald-100 rounded-lg p-4">
+          <div 
+            className="bg-emerald-50/50 border border-emerald-100 rounded-lg p-4 cursor-pointer hover:bg-emerald-50 transition-colors"
+            onClick={() => navigateToDetails('exchange')}
+          >
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-emerald-100 rounded-lg">
                 <TrendingUp className="w-4 h-4 text-emerald-600" />
               </div>
-              <span className="font-medium text-emerald-900">汇率差盈亏</span>
+              <div className="flex items-center gap-1">
+                <span className="font-medium text-emerald-900">汇率差盈亏</span>
+                <ChevronRight className="w-3 h-3 text-emerald-600/50" />
+              </div>
             </div>
             <div className="flex justify-between items-end">
               <div>
