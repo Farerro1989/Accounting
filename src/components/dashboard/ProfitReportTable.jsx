@@ -57,14 +57,18 @@ export default function ProfitReportTable({ transactions }) {
       groupedData[key].penalty += violationPenalty;
       groupedData[key].totalProfit += violationPenalty;
 
-      // 2. Exclude Returned Funds completely
-      if (t.fund_status === '已退回') return;
-
+      // 2. Exclude special statuses from profit calculations
       const depositAmount = parseFloat(t.deposit_amount) || 0;
       const exchangeRate = parseFloat(t.exchange_rate) || 0;
 
-      // 3. Exclude Frozen (Cannot Process) from profit calc (except penalty which is already added)
+      // Returned: Skip completely
+      if (t.fund_status === '已退回') return;
+
+      // Frozen (Cannot Process): Skip profit calculations (penalty already added)
       if (t.fund_status === '冻结（不能处理）') return;
+
+      // Frozen (Processing): Skip profit calculations (penalty already added)
+      if (t.fund_status === '冻结（正在处理）') return;
 
       if (exchangeRate <= 0) return;
 
