@@ -41,7 +41,7 @@ export default function TransactionForm({ transaction, initialTransferInfo = "",
     transfer_fee: 25,
     violation_penalty: 0,
     fund_status: "等待中",
-    acceptance_usdt: 0
+    acceptance_usdt: 1.02
   });
 
   const [transferInfo, setTransferInfo] = useState(initialTransferInfo);
