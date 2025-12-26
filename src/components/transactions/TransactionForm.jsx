@@ -103,25 +103,26 @@ export default function TransactionForm({ transaction, initialTransferInfo = "",
     const netNative = deposit - fee - commAmount;
     const settlementUsdt = rate > 0 ? (netNative / rate) : 0;
 
-    // 处理特殊状态
+    // 处理特殊状态：已退回、冻结（不能处理）、冻结（正在处理）全部清零
     let finalSettlementUsdt = settlementUsdt;
     let finalCommission = parseFloat(formData.commission_percentage);
     let finalFee = parseFloat(formData.transfer_fee);
+    let finalAcceptance = parseFloat(formData.acceptance_usdt) || 0;
 
-    if (formData.fund_status === "冻结（不能处理）") {
+    if (formData.fund_status === "冻结（不能处理）" || 
+        formData.fund_status === "已退回" || 
+        formData.fund_status === "冻结（正在处理）") {
       finalSettlementUsdt = 0;
       finalCommission = 0;
       finalFee = 0;
-    } else if (formData.fund_status === "已退回") {
-      finalSettlementUsdt = 0;
-      finalCommission = 0;
-      finalFee = 0;
+      finalAcceptance = 0;
     }
 
     const dataWithMaintenance = {
       ...formData,
       commission_percentage: finalCommission,
       transfer_fee: finalFee,
+      acceptance_usdt: finalAcceptance,
       maintenance_end_date: format(maintenanceEndDate, "yyyy-MM-dd"),
       settlement_usdt: parseFloat(finalSettlementUsdt.toFixed(2))
     };
@@ -562,8 +563,8 @@ ${transferInfo}
                 <Label>资金状态</Label>
                 <Select value={formData.fund_status} onValueChange={(value) => {
                   handleChange('fund_status', value);
-                  // 自动化：已退回或冻结（不能处理）时，清零佣金、手续费和承兑回USDT
-                  if (value === '已退回' || value === '冻结（不能处理）') {
+                  // 自动化：已退回、冻结（不能处理）或冻结（正在处理）时，清零所有费用和结算
+                  if (value === '已退回' || value === '冻结（不能处理）' || value === '冻结（正在处理）') {
                     handleChange('commission_percentage', 0);
                     handleChange('transfer_fee', 0);
                     handleChange('acceptance_usdt', 0);
