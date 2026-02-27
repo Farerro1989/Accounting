@@ -265,25 +265,12 @@ export default function Dashboard() {
   const profitMetrics = calculateProfitMetrics();
 
   const getTimeFilterLabel = () => {
-    switch (timeFilter) {
-      case "today": return "今日";
-      case "month": return "本月";
-      case "quarter": return `${selectedYear}年第${selectedQuarter.slice(1)}季度`;
-      case "year": return `${selectedYear}年全年`;
-      case "all": return "累计";
-      default: return "累计";
-    }
-  };
-
-  const generateYearOptions = () => {
-    const currentYear = new Date().getFullYear();
-    const startYear = 2025;
-    const endYear = Math.max(currentYear + 2, 2030);
-    const years = [];
-    for (let year = startYear; year <= endYear; year++) {
-      years.push(year.toString());
-    }
-    return years;
+    const { filterMode, year, month, day } = dateFilter;
+    if (filterMode === "all") return "全部累计";
+    if (filterMode === "year") return `${year}年`;
+    if (filterMode === "month") return `${year}年${month}月`;
+    if (filterMode === "day") return `${year}年${month}月${day}日`;
+    return "全部";
   };
 
   const currencyColors = ["green", "blue", "yellow", "purple", "red", "orange", "indigo"];
