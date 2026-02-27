@@ -307,7 +307,6 @@ export default function TransactionList({ transactions, loading, onEdit, onDelet
           })}
         </TableBody>
       </Table>
-    </div>
       </div>
     </>
   );
