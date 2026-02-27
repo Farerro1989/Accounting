@@ -982,27 +982,22 @@ Deno.serve(async (req) => {
       mergedData.customer_nationality = extractedNationality;
     }
 
-    // 2. 如果当前消息没有证件信息，尝试查找同组(Media Group)或最近的证件消息
+    // 2. 如果当前消息没有证件信息，尝试查找同组(Media Group)或最近5分钟的证件消息
     if (!extractedCustomerName && !extractedAge) {
        try {
-         // 获取最近的20条消息 (优化性能，防止卡顿)
-         const recentMsgs = await base44.asServiceRole.entities.TelegramMessage.list('-created_date', 20); 
-         
-         // 查找逻辑:
-         // A. 如果有 mediaGroupId，找同组的 type='id_card'
-         // B. 如果没有，找同 chat_id 且时间在最近 5 分钟内的 type='id_card'
+         const recentMsgs = await base44.asServiceRole.entities.TelegramMessage.list('-created_date', 30);
+         const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
          
          const targetIdCardMsg = recentMsgs.find(m => {
            if (m.chat_id !== String(chatId)) return false;
            if (!m.analysis_result || m.analysis_result.image_type !== 'id_card') return false;
            
-           // A. Media Group 匹配
+           // A. Media Group 匹配（最优先）
            if (mediaGroupId && m.media_group_id === mediaGroupId) return true;
            
-           // B. 时间匹配 (忽略同一次请求的自己，虽然 list 可能还没包含自己或者刚存入)
-           // 简单起见，只要是最近一条证件即可 (假设最近的证件就是匹配的)
-           // 为防止关联到很久以前的，可以加个数量限制或时间判断，这里简化为最近一条
-           return true; 
+           // B. 时间匹配：5分钟内的证件照才关联
+           const msgTime = new Date(m.created_date).getTime();
+           return msgTime >= fiveMinutesAgo;
          });
 
          if (targetIdCardMsg && targetIdCardMsg.analysis_result) {
