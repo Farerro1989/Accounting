@@ -39,7 +39,7 @@ export default function Dashboard() {
       setLoading(true);
       try {
         const [transactionData, userData] = await Promise.all([
-          Transaction.list("-created_date", 1000),
+          base44.entities.Transaction.list("-created_date", 1000),
           base44.auth.me()
         ]);
         setTransactions(transactionData);
