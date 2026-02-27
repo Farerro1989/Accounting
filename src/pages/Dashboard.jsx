@@ -251,7 +251,7 @@ export default function Dashboard() {
 
   const handleUpdateTransaction = async (transactionId, updateData) => {
     try {
-      await Transaction.update(transactionId, updateData);
+      await base44.entities.Transaction.update(transactionId, updateData);
       await loadTransactions();
       
       if (selectedStatus) {
