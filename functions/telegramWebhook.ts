@@ -676,22 +676,27 @@ Deno.serve(async (req) => {
     
     // ============ 指令处理 ============
 
-    // 查账 指令：生成只读查看链接
+    // 查账 指令：生成只读查看链接（内联 token 生成，无需 auth）
     if (messageText.trim() === '查账') {
       try {
-        const base44ForToken = createClientFromRequest(req);
-        const result = await base44ForToken.asServiceRole.functions.invoke('getReadOnlyToken', {});
-        const viewUrl = result.data?.url || (APP_URL ? `${APP_URL}/ReadOnlyView?token=${result.data?.token}` : null);
+        const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+        const secret = BOT_TOKEN || "fallback-secret";
+        const payload = `readonly:${expiresAt}`;
+        const key = await crypto.subtle.importKey(
+          "raw", new TextEncoder().encode(secret),
+          { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+        );
+        const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+        const sigHex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+        const tokenData = JSON.stringify({ expiresAt, sig: sigHex });
+        const token = btoa(tokenData).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        const viewUrl = `${APP_URL}/ReadOnlyView?token=${token}`;
         
-        if (viewUrl) {
-          const msg = `🔐 <b>账目查看链接已生成</b>\n\n` +
-            `📋 点击下方链接查看账目（只读模式）：\n${viewUrl}\n\n` +
-            `⏰ 链接有效期：<b>24小时</b>\n` +
-            `🔒 此链接仅供查看，无法修改任何数据`;
-          await sendTelegramMessage(chatId, msg, messageId);
-        } else {
-          await sendTelegramMessage(chatId, '❌ 生成链接失败，请联系管理员设置 APP_URL 环境变量', messageId);
-        }
+        const msg = `🔐 <b>账目查看链接已生成</b>\n\n` +
+          `📋 点击下方链接查看账目（只读模式）：\n${viewUrl}\n\n` +
+          `⏰ 链接有效期：<b>24小时</b>\n` +
+          `🔒 此链接仅供查看，无法修改任何数据`;
+        await sendTelegramMessage(chatId, msg, messageId);
       } catch (err) {
         console.error('生成查账链接失败:', err);
         await sendTelegramMessage(chatId, `❌ 生成链接失败: ${err.message}`, messageId);
