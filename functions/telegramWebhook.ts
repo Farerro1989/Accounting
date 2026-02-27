@@ -793,13 +793,27 @@ Deno.serve(async (req) => {
           idCardPhotoUrl = imageUrl;
           if (analysis.data.name) extractedCustomerName = analysis.data.name;
           if (analysis.data.birth_date) {
-            // 计算年龄
             const birthYear = parseInt(analysis.data.birth_date.substring(0, 4));
             if (!isNaN(birthYear)) {
               extractedAge = new Date().getFullYear() - birthYear;
             }
           }
           if (analysis.data.nationality) extractedNationality = analysis.data.nationality;
+          
+          // 🆕 仅有证件照，无水单关键词 → 主动询问用途
+          if (!hasKeywordsEarly && photos.length === 1 && !messageText && !message.document) {
+            const idName = extractedCustomerName ? `（${extractedCustomerName}）` : '';
+            await sendTelegramMessage(
+              chatId,
+              `🪪 <b>检测到证件照片${idName}</b>\n\n` +
+              `请问这张证件照片的用途是：\n` +
+              `1️⃣ 客户身份核验（KYC）\n` +
+              `2️⃣ 关联某笔汇款交易\n\n` +
+              `如需关联交易，请在发送证件时同时发送水单，或回复相关水单消息。\n` +
+              `证件信息已记录，下次发送水单时会自动关联。`,
+              messageId
+            );
+          }
         } else if (type === 'transfer_receipt') {
           transferReceiptUrl = imageUrl;
           if (!transferData) {
