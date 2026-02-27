@@ -87,15 +87,24 @@ export default function StatusDetailModal({ status, transactions, onClose, onUpd
     }));
   };
 
+  const totalUsdt = transactions.reduce((sum, t) => {
+    const dep = parseFloat(t.deposit_amount) || 0;
+    const rate = parseFloat(t.exchange_rate) || 0;
+    return sum + (rate > 0 ? dep / rate : 0);
+  }, 0);
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
+          <DialogTitle className="flex items-center gap-3 flex-wrap">
             <Badge className={`${statusColors[status]} border`}>
               {status}
             </Badge>
             <span>交易详情 ({transactions.length}笔)</span>
+            <span className="text-sm font-normal text-slate-500">
+              合计 ≈ <span className="text-emerald-600 font-semibold">{totalUsdt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT</span>
+            </span>
           </DialogTitle>
         </DialogHeader>
         
