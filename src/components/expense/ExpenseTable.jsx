@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Edit, Trash2 } from "lucide-react";
 import { format } from "date-fns";
+// Note: Edit/Trash2 already imported above
 
 export default function ExpenseTable({ expenses, loading, onEdit, onDelete }) {
   if (loading) {
@@ -125,7 +126,8 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }) {
             </TableRow>
           ))}
         </TableBody>
-      </Table>
-    </div>
-  );
-}
+        </Table>
+        </div>
+        </>
+        );
+        }
