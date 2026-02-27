@@ -3,11 +3,10 @@ import { Transaction } from "@/entities/Transaction";
 import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { TrendingUp, DollarSign, CreditCard, Calendar, BarChartHorizontal, Coins, Calculator, Target, AlertCircle, Download } from "lucide-react";
-import { isValid, isWithinInterval, startOfYear, endOfYear } from "date-fns";
+import { TrendingUp, DollarSign, CreditCard, Coins, AlertCircle, Download } from "lucide-react";
+import { isValid } from "date-fns";
 import DateRangeFilter from "../components/dashboard/DateRangeFilter";
 import { useNavigate } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import PullToRefresh from "../components/mobile/PullToRefresh";
 
