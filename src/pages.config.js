@@ -64,6 +64,7 @@ import TelegramMessages from './pages/TelegramMessages';
 import TelegramSetup from './pages/TelegramSetup';
 import Transactions from './pages/Transactions';
 import UserManagement from './pages/UserManagement';
+import Profile from './pages/Profile';
 import __Layout from './Layout.jsx';
 
 
@@ -85,6 +86,7 @@ export const PAGES = {
     "TelegramSetup": TelegramSetup,
     "Transactions": Transactions,
     "UserManagement": UserManagement,
+    "Profile": Profile,
 }
 
 export const pagesConfig = {
