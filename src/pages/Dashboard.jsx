@@ -9,6 +9,7 @@ import DateRangeFilter from "../components/dashboard/DateRangeFilter";
 import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
+import PullToRefresh from "../components/mobile/PullToRefresh";
 
 import StatCard from "../components/dashboard/StatCard";
 import TransactionChart from "../components/dashboard/TransactionChart";
@@ -322,6 +323,7 @@ export default function Dashboard() {
   }, [transactions, dateFilter]);
 
   return (
+    <PullToRefresh onRefresh={loadTransactions}>
     <div className="p-4 md:p-8 space-y-8 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen">
       <div className="max-w-7xl mx-auto space-y-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -555,5 +557,6 @@ export default function Dashboard() {
         )}
       </div>
     </div>
+    </PullToRefresh>
   );
 }
