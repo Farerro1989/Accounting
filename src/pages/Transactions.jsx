@@ -245,6 +245,10 @@ export default function Transactions() {
           )}
         </AnimatePresence>
 
+        {!loading && transactions.length > 0 && (
+          <TransactionCharts transactions={transactions} />
+        )}
+
         <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-slate-200 shadow-lg p-6">
           <div className="flex flex-col md:flex-row gap-4 mb-6">
             <div className="relative flex-1">
