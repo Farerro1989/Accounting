@@ -172,10 +172,13 @@ export default function Layout({ children, currentPageName }) {
         </Sidebar>
 
         <main className="flex-1 flex flex-col">
-          <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-6 py-4 md:hidden">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger className="hover:bg-slate-100 p-2 rounded-lg transition-colors duration-200" />
-              <h1 className="text-xl font-bold text-slate-900">优汇{systemConfig.name}</h1>
+          <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 px-4 py-3 sticky top-0 z-30">
+            <div className="flex items-center gap-3">
+              <SidebarTrigger className="hover:bg-slate-100 p-2 rounded-lg transition-colors duration-200 md:hidden shrink-0" />
+              <h1 className="text-lg font-bold text-slate-900 shrink-0 hidden sm:block">优汇{systemConfig.name}</h1>
+              <div className="flex-1 flex justify-end">
+                <GlobalSearch />
+              </div>
             </div>
           </header>
 
