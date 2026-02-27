@@ -63,7 +63,12 @@ export default function Layout({ children, currentPageName }) {
   }, []);
 
   const handleLogout = async () => {
-    base44.auth.logout();
+    try {
+      base44.auth.logout();
+      window.location.reload();
+    } catch (error) {
+      console.error("登出失败:", error);
+    }
   };
 
   const hasPermission = (permission) => {
