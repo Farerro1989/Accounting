@@ -413,6 +413,14 @@ export default function Dashboard() {
                 color="blue"
                 loading={loading}
               />
+              <StatCard
+                title="总入金金额 (USDT)"
+                value={metrics.totalDepositUsdt?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                description="按各币种汇率换算"
+                icon={Coins}
+                color="indigo"
+                loading={loading}
+              />
 
               {majorCurrencies.map((currency, index) => {
                 const data = metrics.depositsByCurrency[currency] || { amount: 0, count: 0 };
