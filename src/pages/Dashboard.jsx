@@ -75,77 +75,21 @@ export default function Dashboard() {
     setLoading(false);
   };
 
-  const getQuarterDates = (year, quarter) => {
-    const yearNum = parseInt(year);
-    switch (quarter) {
-      case "Q1":
-        return {
-          start: new Date(yearNum, 0, 1),
-          end: new Date(yearNum, 2, 31, 23, 59, 59)
-        };
-      case "Q2":
-        return {
-          start: new Date(yearNum, 3, 1),
-          end: new Date(yearNum, 5, 30, 23, 59, 59)
-        };
-      case "Q3":
-        return {
-          start: new Date(yearNum, 6, 1),
-          end: new Date(yearNum, 8, 30, 23, 59, 59)
-        };
-      case "Q4":
-        return {
-          start: new Date(yearNum, 9, 1),
-          end: new Date(yearNum, 11, 31, 23, 59, 59)
-        };
-      default:
-        return { start: new Date(), end: new Date() };
-    }
-  };
-
   const getFilteredTransactions = () => {
-    const now = new Date();
-    
-    switch (timeFilter) {
-      case "today":
-        const todayStart = startOfDay(now);
-        const todayEnd = endOfDay(now);
-        return transactions.filter(t => {
-          const transactionDate = new Date(t.created_date);
-          return isValid(transactionDate) && 
-                 isWithinInterval(transactionDate, { start: todayStart, end: todayEnd });
-        });
-        
-      case "month":
-        const monthStart = startOfMonth(now);
-        const monthEnd = endOfMonth(now);
-        return transactions.filter(t => {
-          const transactionDate = new Date(t.created_date);
-          return isValid(transactionDate) && 
-                 isWithinInterval(transactionDate, { start: monthStart, end: monthEnd });
-        });
+    const { filterMode, year, month, day } = dateFilter;
+    if (filterMode === "all") return transactions;
 
-      case "quarter":
-        const { start: quarterStart, end: quarterEnd } = getQuarterDates(selectedYear, selectedQuarter);
-        return transactions.filter(t => {
-          const transactionDate = new Date(t.created_date);
-          return isValid(transactionDate) && 
-                 isWithinInterval(transactionDate, { start: quarterStart, end: quarterEnd });
-        });
-
-      case "year":
-        const yearStart = startOfYear(new Date(parseInt(selectedYear), 0, 1));
-        const yearEnd = endOfYear(new Date(parseInt(selectedYear), 0, 1));
-        return transactions.filter(t => {
-          const transactionDate = new Date(t.created_date);
-          return isValid(transactionDate) && 
-                 isWithinInterval(transactionDate, { start: yearStart, end: yearEnd });
-        });
-        
-      case "all":
-      default:
-        return transactions;
-    }
+    return transactions.filter(t => {
+      const d = new Date(t.deposit_date || t.created_date);
+      if (!isValid(d)) return false;
+      const tYear = d.getFullYear();
+      const tMonth = d.getMonth() + 1;
+      const tDay = d.getDate();
+      if (filterMode === "year") return tYear === parseInt(year);
+      if (filterMode === "month") return tYear === parseInt(year) && tMonth === parseInt(month);
+      if (filterMode === "day") return tYear === parseInt(year) && tMonth === parseInt(month) && tDay === parseInt(day);
+      return true;
+    });
   };
 
   const calculateMetrics = () => {
