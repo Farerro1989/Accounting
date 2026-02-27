@@ -61,41 +61,28 @@ export default function ProfitReportTable({ transactions }) {
       // 2. Exclude special statuses from profit calculations
       const depositAmount = parseFloat(t.deposit_amount) || 0;
       const exchangeRate = parseFloat(t.exchange_rate) || 0;
+      // transfer_fee is already in USDT
+      const feeUsdt = parseFloat(t.transfer_fee) || 0;
 
-      // Returned: Skip completely
       if (t.fund_status === '已退回') return;
-
-      // Frozen (Cannot Process): Skip profit calculations (penalty already added)
       if (t.fund_status === '冻结（不能处理）') return;
-
-      // Frozen (Processing): Skip profit calculations (penalty already added)
       if (t.fund_status === '冻结（正在处理）') return;
+      if (depositAmount <= 0 || exchangeRate <= 0) return;
 
-      if (exchangeRate <= 0) return;
-
-      // 4. Calculate Profit Components ONLY for Completed Transactions
+      // Calculate Profit Components ONLY for Completed Transactions
       if (t.fund_status === '已完成交易') {
-        const feeNative = parseFloat(t.transfer_fee) || 0;
         const commNative = depositAmount * ((parseFloat(t.commission_percentage) || 0) / 100);
-        
-        // USDT conversions
         const commissionUsdt = commNative / exchangeRate;
-        const feeUsdt = feeNative / exchangeRate;
         const initialUsdt = depositAmount / exchangeRate;
 
-        // Exchange Profit Logic: Actual Acceptance - Initial
         const acceptanceUsdt = parseFloat(t.acceptance_usdt) || 0;
-        // If acceptance_usdt is 0, assume it equals initialUsdt (no exchange gain/loss)
         const actualAcceptance = acceptanceUsdt > 0 ? acceptanceUsdt : initialUsdt;
         const exchangeProfit = actualAcceptance - initialUsdt;
 
-        // Aggregate
         groupedData[key].count += 1;
         groupedData[key].commission += commissionUsdt;
         groupedData[key].fees += feeUsdt;
         groupedData[key].exchangeProfit += exchangeProfit;
-        
-        // Total Profit = Comm + Fee + ExchProfit + Penalty
         groupedData[key].totalProfit += (commissionUsdt + feeUsdt + exchangeProfit);
       }
     });
