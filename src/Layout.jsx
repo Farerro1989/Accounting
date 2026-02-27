@@ -100,7 +100,7 @@ export default function Layout({ children, currentPageName }) {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <Sidebar className="border-r border-slate-200 bg-white/80 backdrop-blur-sm flex flex-col">
+        <Sidebar className="hidden md:flex border-r border-slate-200 bg-white/80 backdrop-blur-sm flex-col">
           <SidebarHeader className="border-b border-slate-200 p-6">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 bg-gradient-to-r ${systemConfig.color} rounded-xl flex items-center justify-center shadow-lg`}>
