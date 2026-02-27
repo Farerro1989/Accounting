@@ -748,6 +748,10 @@ Deno.serve(async (req) => {
     if (message.photo && message.photo.length > 0) {
       photos.push(message.photo[message.photo.length - 1].file_id);
     }
+
+    // 🆕 提前检测关键词（用于图片处理阶段判断是否主动询问）
+    const transactionKeywords = ['汇款', '转账', '水单', '汇款单', '收款'];
+    const hasKeywordsEarly = transactionKeywords.some(k => messageText.includes(k));
     
     // 1. 处理图片
     let idCardPhotoUrl = '';
