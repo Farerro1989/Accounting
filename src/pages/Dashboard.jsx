@@ -115,9 +115,17 @@ export default function Dashboard() {
     );
     const totalTransactions = effectiveTransactions.length;
 
+    // 总入金 USDT（所有有效交易按汇率换算）
+    const totalDepositUsdt = effectiveTransactions.reduce((sum, t) => {
+      const dep = parseFloat(t.deposit_amount) || 0;
+      const rate = parseFloat(t.exchange_rate) || 0;
+      return sum + (rate > 0 ? dep / rate : 0);
+    }, 0);
+
     return {
       depositsByCurrency,
       totalTransactions,
+      totalDepositUsdt,
     };
   };
 
