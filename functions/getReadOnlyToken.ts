@@ -1,6 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
-// 生成只读访问 token（简单 HMAC 签名，带过期时间）
+const APP_URL = Deno.env.get("APP_URL") || "https://app.base44.com";
+
+// 生成只读访问 token（HMAC 签名，带过期时间）
 async function generateToken() {
   const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24小时有效
   const payload = `readonly:${expiresAt}`;
@@ -16,13 +18,15 @@ async function generateToken() {
   const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
   const sigHex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
   
-  return Buffer.from(JSON.stringify({ expiresAt, sig: sigHex })).toString('base64url');
+  const tokenData = JSON.stringify({ expiresAt, sig: sigHex });
+  return btoa(tokenData).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 Deno.serve(async (req) => {
   try {
     const token = await generateToken();
-    return Response.json({ token });
+    const url = `${APP_URL}/ReadOnlyView?token=${token}`;
+    return Response.json({ token, url });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
