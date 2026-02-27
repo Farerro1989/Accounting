@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Transaction } from "@/entities/Transaction";
-import { User } from "@/entities/User";
+import { base44 } from "@/api/base44Client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { TrendingUp, DollarSign, CreditCard, Calendar, BarChartHorizontal, Coins, Calculator, Target, AlertCircle, Download } from "lucide-react";
