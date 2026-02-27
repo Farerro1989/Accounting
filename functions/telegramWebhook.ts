@@ -675,6 +675,30 @@ Deno.serve(async (req) => {
     if (mediaGroupId) console.log('📦 Media Group ID:', mediaGroupId);
     
     // ============ 指令处理 ============
+
+    // 查账 指令：生成只读查看链接
+    if (messageText.trim() === '查账') {
+      try {
+        const base44ForToken = createClientFromRequest(req);
+        const result = await base44ForToken.asServiceRole.functions.invoke('getReadOnlyToken', {});
+        const viewUrl = result.data?.url || (APP_URL ? `${APP_URL}/ReadOnlyView?token=${result.data?.token}` : null);
+        
+        if (viewUrl) {
+          const msg = `🔐 <b>账目查看链接已生成</b>\n\n` +
+            `📋 点击下方链接查看账目（只读模式）：\n${viewUrl}\n\n` +
+            `⏰ 链接有效期：<b>24小时</b>\n` +
+            `🔒 此链接仅供查看，无法修改任何数据`;
+          await sendTelegramMessage(chatId, msg, messageId);
+        } else {
+          await sendTelegramMessage(chatId, '❌ 生成链接失败，请联系管理员设置 APP_URL 环境变量', messageId);
+        }
+      } catch (err) {
+        console.error('生成查账链接失败:', err);
+        await sendTelegramMessage(chatId, `❌ 生成链接失败: ${err.message}`, messageId);
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }
+
     if (messageText.startsWith('/process_batch')) {
       const resultMsg = await processBatch(base44, chatId);
       await sendTelegramMessage(chatId, resultMsg, messageId);
