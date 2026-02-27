@@ -319,7 +319,7 @@ export default function Dashboard() {
     });
 
     return stats;
-  }, [transactions, timeFilter, selectedQuarter, selectedYear]);
+  }, [transactions, dateFilter]);
 
   return (
     <div className="p-4 md:p-8 space-y-8 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 min-h-screen">
