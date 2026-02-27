@@ -48,8 +48,9 @@ export default function ReadOnlyView() {
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      // Use service role to fetch all transactions for read-only view
-      const data = await base44.functions.invoke('getPublicTransactions');
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+      const data = await base44.functions.invoke('getPublicTransactions', { token });
       setTransactions(data.data?.transactions || []);
     } catch (e) {
       console.error(e);
