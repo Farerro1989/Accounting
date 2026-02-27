@@ -1,109 +1,78 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 
+// ============= 配置 =============
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const APP_URL = Deno.env.get("APP_URL") || "";
-// 群播通知：从环境变量读取需要广播的群 chat_id（逗号分隔），若未设置则不广播
-const BROADCAST_CHAT_IDS = (Deno.env.get("BROADCAST_CHAT_IDS") || "").split(",").map(s => s.trim()).filter(Boolean);
+const BROADCAST_CHAT_IDS = (Deno.env.get("BROADCAST_CHAT_IDS") || "")
+  .split(",").map(s => s.trim()).filter(Boolean);
 
-// ============= Telegram API 函数 =============
+const CURRENCY_MAP = {
+  'EUR': 'EUR欧元', 'USD': 'USD美元', 'GBP': 'GBP英镑',
+  'SGD': 'SGD新元', 'MYR': 'MYR马币', 'AUD': 'AUD澳币',
+  'CHF': 'CHF瑞郎', 'THB': 'THB泰铢', 'VND': 'VND越南盾',
+  'CAD': 'CAD加元', 'HKD': 'HKD港币', 'KRW': 'KRW韩币',
+  'CNY': 'CNY人民币', 'RMB': 'CNY人民币', 'JPY': 'JPY日元',
+  'AED': 'AED迪拉姆', 'PHP': 'PHP菲律宾比索', 'IDR': 'IDR印尼盾'
+};
 
-async function sendTelegramMessage(chatId, message, replyToMessageId = null) {
+const CURRENCY_MAP_ZH = {
+  ...CURRENCY_MAP,
+  '欧': 'EUR欧元', '美': 'USD美元', '英': 'GBP英镑', '新': 'SGD新元',
+  '马': 'MYR马币', '澳': 'AUD澳币', '瑞': 'CHF瑞郎', '泰': 'THB泰铢',
+  '越': 'VND越南盾', '加': 'CAD加元', '港': 'HKD港币', '韩': 'KRW韩币',
+  '人': 'CNY人民币', '日': 'JPY日元', '迪': 'AED迪拉姆',
+  '菲': 'PHP菲律宾比索', '印': 'IDR印尼盾'
+};
+
+const TRANSACTION_KEYWORDS = ['汇款', '转账', '水单', '汇款单', '收款'];
+const TRANSACTION_TRIGGER_KEYWORDS = [
+  '汇款', '转账', '水单', '汇款单', '币种', '金额', '查收', '收款', '维护期', 'IBAN', '银行', '账户'
+];
+
+// ============= Telegram API =============
+
+async function sendTelegramMessage(chatId, text, replyToMessageId = null) {
   try {
-    const payload = {
-      chat_id: chatId,
-      text: message,
-      parse_mode: 'HTML'
-    };
-    
-    if (replyToMessageId) {
-      payload.reply_to_message_id = replyToMessageId;
-    }
-    
-    const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
+    const payload = { chat_id: chatId, text, parse_mode: 'HTML' };
+    if (replyToMessageId) payload.reply_to_message_id = replyToMessageId;
+    const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    
-    return await response.json();
+    return await res.json();
   } catch (error) {
     console.error('发送消息失败:', error);
     return null;
   }
 }
 
-async function downloadTelegramFile(fileId) {
-  try {
-    console.log('📥 下载文件:', fileId);
-    
-    const fileInfoResponse = await fetch(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
-    const fileInfo = await fileInfoResponse.json();
-    
-    if (!fileInfo.ok) {
-      throw new Error('获取文件信息失败');
+async function broadcastMessage(originChatId, text) {
+  for (const broadcastId of BROADCAST_CHAT_IDS) {
+    if (broadcastId !== String(originChatId)) {
+      await sendTelegramMessage(broadcastId, text);
     }
-    
-    const filePath = fileInfo.result.file_path;
-    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
-    
-    const fileResponse = await fetch(fileUrl);
-    const arrayBuffer = await fileResponse.arrayBuffer();
-    
-    console.log('✅ 文件下载成功');
-    return new Blob([arrayBuffer]);
-  } catch (error) {
-    console.error('❌ 下载文件失败:', error);
-    throw error;
   }
 }
 
-// ============= 图片/文档分析函数 =============
-
-// LLM分析文档 (PDF/Word)
-async function analyzeDocument(base44, docUrl) {
-  const currentYear = new Date().getFullYear();
-  try {
-    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt: `请分析这份文档，提取转账水单信息。如果是水单，请提取以下字段并返回JSON：
-      - currency (币种代码,如USD, EUR)
-      - amount (金额,数字)
-      - customer_name (汇款人姓名)
-      - receiving_account_name (收款人/公司名)
-      - receiving_account_number (收款账号/IBAN)
-      - bank_name (银行名称)
-      - date (日期 YYYY-MM-DD)
-      
-      如果不是水单，返回 null。`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          currency: { type: "string" },
-          amount: { type: "number" },
-          customer_name: { type: "string" },
-          receiving_account_name: { type: "string" },
-          receiving_account_number: { type: "string" },
-          bank_name: { type: "string" },
-          date: { type: "string" }
-        }
-      },
-      file_urls: [docUrl]
-    });
-
-    if (!result || !result.amount) return null;
-    return { imageUrl: docUrl, data: result };
-  } catch (error) {
-    console.error("文档分析失败:", error);
-    return null;
-  }
+async function downloadTelegramFile(fileId) {
+  console.log('📥 下载文件:', fileId);
+  const fileInfoRes = await fetch(`${TELEGRAM_API}/getFile?file_id=${fileId}`);
+  const fileInfo = await fileInfoRes.json();
+  if (!fileInfo.ok) throw new Error('获取文件信息失败');
+  const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileInfo.result.file_path}`;
+  const fileRes = await fetch(fileUrl);
+  const arrayBuffer = await fileRes.arrayBuffer();
+  console.log('✅ 文件下载成功');
+  return new Blob([arrayBuffer]);
 }
 
-// 智能图片内容分析 (支持水单和证件)
+// ============= AI 分析 =============
+
 async function analyzeImageContent(base44, imageUrl) {
-  const currentYear = new Date().getFullYear();
   try {
-    console.log('🔍 开始智能分析图片内容...', imageUrl);
-    
+    console.log('🔍 分析图片内容...', imageUrl);
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
       prompt: `请分析这张图片的内容。判断它是"证件照片"(id_card)还是"银行转账单"(transfer_receipt)。
 
@@ -125,79 +94,80 @@ async function analyzeImageContent(base44, imageUrl) {
       response_json_schema: {
         type: "object",
         properties: {
-          image_type: { 
-            type: "string", 
-            enum: ["id_card", "transfer_receipt", "other"],
-            description: "图片类型"
-          },
-          // 证件字段
-          name: { type: "string", description: "证件姓名" },
-          birth_date: { type: "string", description: "出生日期" },
-          nationality: { type: "string", description: "国籍" },
-          // 水单字段
-          amount: { type: "number" },
-          currency: { type: "string" },
-          recipient_name: { type: "string" },
-          account_number: { type: "string" },
-          bank_name: { type: "string" },
-          transfer_date: { type: "string" }
+          image_type: { type: "string", enum: ["id_card", "transfer_receipt", "other"] },
+          name: { type: "string" }, birth_date: { type: "string" }, nationality: { type: "string" },
+          amount: { type: "number" }, currency: { type: "string" },
+          recipient_name: { type: "string" }, account_number: { type: "string" },
+          bank_name: { type: "string" }, transfer_date: { type: "string" }
         },
         required: ["image_type"]
       }
     });
-    
-    console.log('✅ 图片智能分析结果:', result);
+    console.log('✅ 图片分析结果:', result);
     return { imageUrl, data: result };
-    
   } catch (error) {
     console.error('❌ 图片分析失败:', error);
     return null;
   }
 }
 
-// ============= 文本解析函数 =============
-
-// LLM分析文本内容 (当正则匹配失败或需要更精确提取时使用)
-async function analyzeText(base44, text) {
+async function analyzeDocument(base44, docUrl) {
   try {
     const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
-      prompt: `请仔细分析以下转账水单文本，提取关键信息并返回JSON。
-      
-      文本内容:
-      ${text}
-      
-      请提取以下字段：
-      - currency (币种代码,如USD, EUR, CNY等)
-      - amount (金额,数字)
-      - customer_name (汇款人姓名)
-      - receiving_account_name (收款人/公司名)
-      - receiving_account_number (收款账号/IBAN)
-      - bank_name (银行名称)
-      - date (日期 YYYY-MM-DD)
-      - maintenance_days (维护期天数, 数字)
-      
-      注意:
-      1. 币种请使用标准3位代码
-      2. 金额请返回纯数字
-      3. 如果没有找到某项信息，请返回null`,
+      prompt: `请分析这份文档，提取转账水单信息。如果是水单，提取以下字段：
+- currency (币种代码), amount (金额,数字), customer_name (汇款人姓名)
+- receiving_account_name (收款人/公司名), receiving_account_number (收款账号/IBAN)
+- bank_name (银行名称), date (日期 YYYY-MM-DD)
+如果不是水单，返回 null。`,
       response_json_schema: {
         type: "object",
         properties: {
-          currency: { type: "string" },
-          amount: { type: "number" },
-          customer_name: { type: "string" },
-          receiving_account_name: { type: "string" },
-          receiving_account_number: { type: "string" },
-          bank_name: { type: "string" },
-          date: { type: "string" },
-          maintenance_days: { type: "number" }
+          currency: { type: "string" }, amount: { type: "number" },
+          customer_name: { type: "string" }, receiving_account_name: { type: "string" },
+          receiving_account_number: { type: "string" }, bank_name: { type: "string" },
+          date: { type: "string" }
+        }
+      },
+      file_urls: [docUrl]
+    });
+    if (!result || !result.amount) return null;
+    return { imageUrl: docUrl, data: result };
+  } catch (error) {
+    console.error('❌ 文档分析失败:', error);
+    return null;
+  }
+}
+
+async function analyzeTextWithLLM(base44, text) {
+  try {
+    const result = await base44.asServiceRole.integrations.Core.InvokeLLM({
+      prompt: `请仔细分析以下转账水单文本，提取关键信息并返回JSON。
+
+文本内容:
+${text}
+
+请提取以下字段：
+- currency (币种代码,如USD, EUR, CNY等)
+- amount (金额,数字)
+- customer_name (汇款人姓名)
+- receiving_account_name (收款人/公司名)
+- receiving_account_number (收款账号/IBAN)
+- bank_name (银行名称)
+- date (日期 YYYY-MM-DD)
+- maintenance_days (维护期天数, 数字)
+
+注意: 币种请使用标准3位代码，金额请返回纯数字，找不到的字段返回null`,
+      response_json_schema: {
+        type: "object",
+        properties: {
+          currency: { type: "string" }, amount: { type: "number" },
+          customer_name: { type: "string" }, receiving_account_name: { type: "string" },
+          receiving_account_number: { type: "string" }, bank_name: { type: "string" },
+          date: { type: "string" }, maintenance_days: { type: "number" }
         }
       }
     });
-    
     if (!result) return null;
-    
-    // 简单的字段映射以匹配内部格式
     const mapped = {};
     if (result.amount) mapped.deposit_amount = result.amount;
     if (result.currency) mapped.currency = result.currency;
@@ -207,249 +177,169 @@ async function analyzeText(base44, text) {
     if (result.bank_name) mapped.bank_name = result.bank_name;
     if (result.date) mapped.deposit_date = result.date;
     if (result.maintenance_days) mapped.maintenance_days = result.maintenance_days;
-    
     return mapped;
   } catch (error) {
-    console.error("文本LLM分析失败:", error);
+    console.error('❌ 文本LLM分析失败:', error);
     return null;
   }
 }
 
+// ============= 文本解析 =============
+
+function normalizeCurrency(raw) {
+  const upper = raw.toUpperCase();
+  for (const [key, value] of Object.entries(CURRENCY_MAP_ZH)) {
+    if (upper.includes(key)) return value;
+  }
+  return null;
+}
+
 function parseWaterSlip(text) {
   if (!text) return {};
-  
   const data = {};
   const lines = text.split('\n');
   const currentYear = new Date().getFullYear();
-  
+
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    
-    // 1. 汇款日期 (支持空格，支持MM-DD自动补年份)
-    if (/(?:汇款\s*日期|日期)\s*[：:：=]/.test(trimmed)) {
-      // 匹配完整日期 YYYY-MM-DD
-      let match = trimmed.match(/(?:汇款\s*日期|日期)\s*[：:：=]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2})/);
-      if (match) {
-        data.deposit_date = match[1].replace(/\//g, '-');
+    const t = line.trim();
+    if (!t) continue;
+
+    if (/(?:汇款\s*日期|日期)\s*[：:=]/.test(t)) {
+      let m = t.match(/(?:汇款\s*日期|日期)\s*[：:=]\s*(\d{4}[-/]\d{1,2}[-/]\d{1,2})/);
+      if (m) {
+        data.deposit_date = m[1].replace(/\//g, '-');
       } else {
-        // 匹配简写日期 MM-DD 或 M-D
-        match = trimmed.match(/(?:汇款\s*日期|日期)\s*[：:：=]\s*(\d{1,2}[-/]\d{1,2})/);
-        if (match) {
-          data.deposit_date = `${currentYear}-${match[1].replace(/\//g, '-')}`;
-          // 格式化月日，确保是MM-DD
-          const parts = data.deposit_date.split('-');
-          if (parts.length === 3) {
-            data.deposit_date = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-          }
+        m = t.match(/(?:汇款\s*日期|日期)\s*[：:=]\s*(\d{1,2}[-/]\d{1,2})/);
+        if (m) {
+          const parts = `${currentYear}-${m[1].replace(/\//g, '-')}`.split('-');
+          data.deposit_date = `${parts[0]}-${parts[1].padStart(2,'0')}-${parts[2].padStart(2,'0')}`;
         }
       }
-    }
-    
-    // 2. 维护期
-    else if (/维护期\s*(?:（天数）)?\s*[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/维护期.*?[：:：=]\s*(\d+)/);
-      if (match) data.maintenance_days = parseInt(match[1]);
-    }
-    
-    // 3. 查收币种/入金币种
-    else if (/(?:查收\s*币种|入金\s*币种|币种)\s*[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/(?:查收\s*币种|入金\s*币种|币种)\s*[：:：=]\s*([A-Z]{3}|[\u4e00-\u9fa5]+)/i);
-      if (match) {
-        const curr = match[1].toUpperCase();
-        const currencyMap = {
-          'EUR': 'EUR欧元', '欧': 'EUR欧元',
-          'USD': 'USD美元', '美': 'USD美元',
-          'GBP': 'GBP英镑', '英': 'GBP英镑',
-          'SGD': 'SGD新元', '新': 'SGD新元',
-          'MYR': 'MYR马币', '马': 'MYR马币',
-          'AUD': 'AUD澳币', '澳': 'AUD澳币',
-          'CHF': 'CHF瑞郎', '瑞': 'CHF瑞郎',
-          'THB': 'THB泰铢', '泰': 'THB泰铢',
-          'VND': 'VND越南盾', '越': 'VND越南盾',
-          'CAD': 'CAD加元', '加': 'CAD加元',
-          'HKD': 'HKD港币', '港': 'HKD港币',
-          'KRW': 'KRW韩币', '韩': 'KRW韩币',
-          'CNY': 'CNY人民币', '人': 'CNY人民币',
-          'JPY': 'JPY日元', '日': 'JPY日元',
-          'AED': 'AED迪拉姆', '迪': 'AED迪拉姆',
-          'PHP': 'PHP菲律宾比索', '菲': 'PHP菲律宾比索',
-          'IDR': 'IDR印尼盾', '印': 'IDR印尼盾'
-        };
-        for (const [key, value] of Object.entries(currencyMap)) {
-          if (curr.includes(key)) {
-            data.currency = value;
-            break;
-          }
-        }
+    } else if (/维护期\s*(?:（天数）)?\s*[：:=]/.test(t)) {
+      const m = t.match(/维护期.*?[：:=]\s*(\d+)/);
+      if (m) data.maintenance_days = parseInt(m[1]);
+    } else if (/(?:查收\s*币种|入金\s*币种|币种)\s*[：:=]/.test(t)) {
+      const m = t.match(/(?:查收\s*币种|入金\s*币种|币种)\s*[：:=]\s*([A-Z]{3}|[\u4e00-\u9fa5]+)/i);
+      if (m) {
+        const normalized = normalizeCurrency(m[1]);
+        if (normalized) data.currency = normalized;
       }
-    }
-    
-    // 4. 汇款人姓名
-    else if (/(?:汇款人\s*姓名|汇款人|客户\s*姓名)\s*[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/(?:汇款人\s*姓名|汇款人|客户\s*姓名).*?[：:：=]\s*(.+)/);
-      if (match) data.customer_name = match[1].trim();
-    }
-    
-    // 5. 收款账户名/入款账户名 (扩展匹配: 收款人, 收款方, 公司名, 户名)
-    else if (/(?:收款|入款|公司|账户)\s*(?:账户名|户名|名称|名|人|方)\s*[：:：=]/.test(trimmed) && !/汇款|客户/.test(trimmed)) {
-      const match = trimmed.match(/(?:收款|入款|公司|账户)\s*(?:账户名|户名|名称|名|人|方).*?[：:：=]\s*(.+)/);
-      if (match) data.receiving_account_name = match[1].trim();
-    }
-    
-    // 6. 收款账户/入款账户号 (扩展匹配: 账号, 卡号, 账户号)
-    else if (/(?:收款|入款|公司|账户|银行)\s*(?:账号|账户号|卡号|号码)\s*[：:：=]/.test(trimmed) && !/汇款|客户/.test(trimmed)) {
-      const match = trimmed.match(/(?:收款|入款|公司|账户|银行)\s*(?:账号|账户号|卡号|号码).*?[：:：=]\s*([A-Z0-9\s-]+)/i);
-      if (match) data.receiving_account_number = match[1].trim();
-    }
-    
-    // 7. 查收金额
-    else if (/(?:查收\s*金额|金额)\s*[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/(?:查收\s*金额|金额)\s*[：:：=]\s*([\d,.\s]+)/);
-      if (match) {
-        const amount = parseFloat(match[1].replace(/[,\s]/g, ''));
+    } else if (/(?:汇款人\s*姓名|汇款人|客户\s*姓名)\s*[：:=]/.test(t)) {
+      const m = t.match(/(?:汇款人\s*姓名|汇款人|客户\s*姓名).*?[：:=]\s*(.+)/);
+      if (m) data.customer_name = m[1].trim();
+    } else if (/(?:收款|入款|公司|账户)\s*(?:账户名|户名|名称|名|人|方)\s*[：:=]/.test(t) && !/汇款|客户/.test(t)) {
+      const m = t.match(/(?:收款|入款|公司|账户)\s*(?:账户名|户名|名称|名|人|方).*?[：:=]\s*(.+)/);
+      if (m) data.receiving_account_name = m[1].trim();
+    } else if (/(?:收款|入款|公司|账户|银行)\s*(?:账号|账户号|卡号|号码)\s*[：:=]/.test(t) && !/汇款|客户/.test(t)) {
+      const m = t.match(/(?:收款|入款|公司|账户|银行)\s*(?:账号|账户号|卡号|号码).*?[：:=]\s*([A-Z0-9\s-]+)/i);
+      if (m) data.receiving_account_number = m[1].trim();
+    } else if (/(?:查收\s*金额|金额)\s*[：:=]/.test(t)) {
+      const m = t.match(/(?:查收\s*金额|金额)\s*[：:=]\s*([\d,.\s]+)/);
+      if (m) {
+        const amount = parseFloat(m[1].replace(/[,\s]/g, ''));
         if (!isNaN(amount)) data.deposit_amount = amount;
       }
+    } else if (/(?:汇款\s*笔数|笔数)\s*[：:=]/.test(t)) {
+      const m = t.match(/(?:汇款\s*笔数|笔数)\s*[：:=]\s*(\d+)/);
+      if (m) data.remittance_count = parseInt(m[1]);
+    } else if (/国籍\s*[：:=]/.test(t)) {
+      const m = t.match(/国籍\s*[：:=]\s*(.+)/);
+      if (m) data.customer_nationality = m[1].trim();
+    } else if (/(?:年龄|年齡)\s*[：:=]/.test(t)) {
+      const m = t.match(/(?:年龄|年齡)\s*[：:=]\s*(\d+)/);
+      if (m) data.customer_age = parseInt(m[1]);
+    } else if (/汇率\s*[：:=]/.test(t)) {
+      const m = t.match(/汇率\s*[：:=]\s*([\d.]+)/);
+      if (m) data.exchange_rate = parseFloat(m[1]);
+    } else if (/(?:点位|佣金).*?[：:=]/.test(t)) {
+      const m = t.match(/(?:点位|佣金).*?[：:=]\s*([\d.]+)/);
+      if (m) data.commission_percentage = parseFloat(m[1]);
     }
 
-    // 8. 汇款笔数
-    else if (/(?:汇款\s*笔数|笔数)\s*[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/(?:汇款\s*笔数|笔数)\s*[：:：=]\s*(\d+)/);
-      if (match) data.remittance_count = parseInt(match[1]);
-    }
-
-    // 9. 国籍
-    else if (/国籍\s*[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/国籍\s*[：:：=]\s*(.+)/);
-      if (match) data.customer_nationality = match[1].trim();
-    }
-
-    // 10. 年龄
-    else if (/(?:年龄|年齡)\s*[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/(?:年龄|年齡)\s*[：:：=]\s*(\d+)/);
-      if (match) data.customer_age = parseInt(match[1]);
-    }
-
-    // 11. 汇率
-    else if (/汇率\s*[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/汇率\s*[：:：=]\s*([\d.]+)/);
-      if (match) data.exchange_rate = parseFloat(match[1]);
-    }
-
-    // 12. 点位 (支持 "点位（包含加点）:13%")
-    else if (/(?:点位|佣金).*?[：:：=]/.test(trimmed)) {
-      const match = trimmed.match(/(?:点位|佣金).*?[：:：=]\s*([\d.]+)/);
-      if (match) data.commission_percentage = parseFloat(match[1]);
-    }
-
-    // 13. 进算/拖算 (单独一行或包含在行内)
-    if (/(?:进算|拖算)/.test(trimmed)) {
-      data.calculation_mode = trimmed.includes('拖算') ? '拖算' : '进算';
+    if (/(?:进算|拖算)/.test(t)) {
+      data.calculation_mode = t.includes('拖算') ? '拖算' : '进算';
     }
   }
-  
   return data;
 }
 
-// ============= 数据合并函数 =============
+// ============= 数据合并 =============
 
-function mergeData(transferData, textData) {
+function mergeTransferData(transferData, textData) {
   const merged = { ...textData };
-  
-  // 优先使用转账单识别的信息
-  if (transferData && transferData.data) {
-    const td = transferData.data;
-    
-    if (td.amount) {
-      merged.deposit_amount = td.amount;
-    }
-    
-    if (td.currency) {
-      const curr = td.currency.toUpperCase();
-      const currencyMap = {
-        'EUR': 'EUR欧元', 'USD': 'USD美元', 'GBP': 'GBP英镑',
-        'SGD': 'SGD新元', 'MYR': 'MYR马币', 'AUD': 'AUD澳币',
-        'CHF': 'CHF瑞郎', 'THB': 'THB泰铢', 'VND': 'VND越南盾',
-        'CAD': 'CAD加元', 'HKD': 'HKD港币', 'KRW': 'KRW韩币',
-        'CNY': 'CNY人民币', 'RMB': 'CNY人民币',
-        'JPY': 'JPY日元', 'AED': 'AED迪拉姆',
-        'PHP': 'PHP菲律宾比索', 'IDR': 'IDR印尼盾'
-      };
-      for (const [key, value] of Object.entries(currencyMap)) {
-        if (curr.includes(key)) {
-          merged.currency = value;
-          break;
-        }
-      }
-    }
-    
-    if (td.recipient_name && !merged.receiving_account_name) {
-      merged.receiving_account_name = td.recipient_name;
-    }
-    
-    if (td.account_number) {
-      if (!merged.receiving_account_number) {
-        merged.receiving_account_number = td.account_number;
-      }
-      if (!merged.bank_account) {
-        merged.bank_account = td.account_number;
-      }
-    }
-    
-    if (td.bank_name && !merged.bank_name) {
-      merged.bank_name = td.bank_name;
-    }
-    
-    if (td.transfer_date && !merged.deposit_date) {
-      merged.deposit_date = td.transfer_date;
-    }
+  if (!transferData?.data) return merged;
+  const td = transferData.data;
+
+  if (td.amount) merged.deposit_amount = td.amount;
+
+  if (td.currency) {
+    const normalized = normalizeCurrency(td.currency);
+    if (normalized) merged.currency = normalized;
   }
-  
-  // Removed old default value assignments, createTransaction will handle them
-  
+
+  if (td.recipient_name && !merged.receiving_account_name) merged.receiving_account_name = td.recipient_name;
+  if (td.account_number) {
+    if (!merged.receiving_account_number) merged.receiving_account_number = td.account_number;
+    if (!merged.bank_account) merged.bank_account = td.account_number;
+  }
+  if (td.bank_name && !merged.bank_name) merged.bank_name = td.bank_name;
+  if (td.transfer_date && !merged.deposit_date) merged.deposit_date = td.transfer_date;
+
   return merged;
 }
 
-// ============= 创建交易函数 =============
+// ============= 证件信息提取 =============
+
+function extractIdCardInfo(analysisData) {
+  const info = { name: '', age: null, nationality: '', url: '' };
+  if (!analysisData) return info;
+  if (analysisData.name) info.name = analysisData.name;
+  if (analysisData.nationality) info.nationality = analysisData.nationality;
+  if (analysisData.birth_date) {
+    const birthYear = parseInt(analysisData.birth_date.substring(0, 4));
+    if (!isNaN(birthYear)) info.age = new Date().getFullYear() - birthYear;
+  } else if (analysisData.age) {
+    info.age = analysisData.age;
+  }
+  return info;
+}
+
+// ============= 创建交易 =============
 
 async function createTransaction(base44, data, chatId, messageId, idCardPhotoUrl, transferReceiptUrl) {
-  // 确保数值字段有效
   data.deposit_amount = parseFloat(data.deposit_amount) || 0;
   data.exchange_rate = parseFloat(data.exchange_rate) || 0.96;
   data.commission_percentage = parseFloat(data.commission_percentage) || 13.5;
-  data.transfer_fee = parseFloat(data.transfer_fee) || 25;
 
-  // 生成交易编号
   const numberResponse = await base44.asServiceRole.functions.invoke('generateTransactionNumber', {
     date: data.deposit_date || new Date().toISOString().split('T')[0]
   });
-  
-  // 计算维护期到期日期
+
   const depositDate = new Date(data.deposit_date || new Date());
-  const maintenanceDays = data.maintenance_days || 15; // Default to 15 days
+  const maintenanceDays = data.maintenance_days || 15;
   const maintenanceEndDate = new Date(depositDate);
   maintenanceEndDate.setDate(maintenanceEndDate.getDate() + maintenanceDays);
-  
+
   const transaction = {
     transaction_number: numberResponse.data.transaction_number,
     customer_name: data.customer_name || '待完善',
     customer_age: data.customer_age || null,
+    customer_nationality: data.customer_nationality || '',
     receiving_account_name: data.receiving_account_name || '待完善',
     receiving_account_number: data.receiving_account_number || '待完善',
-    bank_name: data.bank_name || '', // This is for AI-identified bank name or text-parsed '银行名称'
-    bank_account: data.bank_account || '', // This is for AI-identified account number (IBAN)
-    bank_address: data.bank_address || '', // Only from previous text parsing (now removed from parseWaterSlip)
-    bank_location: data.bank_location || '', // Only from previous text parsing (now removed from parseWaterSlip)
+    bank_name: data.bank_name || '',
+    bank_account: data.bank_account || '',
+    bank_address: data.bank_address || '',
+    bank_location: data.bank_location || '',
     currency: data.currency,
     deposit_amount: data.deposit_amount,
     deposit_date: data.deposit_date || new Date().toISOString().split('T')[0],
     maintenance_days: maintenanceDays,
     maintenance_end_date: maintenanceEndDate.toISOString().split('T')[0],
-    exchange_rate: data.exchange_rate || 0.95,
-    commission_percentage: data.commission_percentage || 13.5, // Updated default to 13.5
+    exchange_rate: data.exchange_rate,
+    commission_percentage: data.commission_percentage,
     calculation_mode: data.calculation_mode || '进算',
     remittance_count: data.remittance_count || 1,
-    customer_nationality: data.customer_nationality || '',
     transfer_fee: 25,
     violation_penalty: 0,
     fund_status: '等待中',
@@ -460,30 +350,100 @@ async function createTransaction(base44, data, chatId, messageId, idCardPhotoUrl
     id_card_photo_url: idCardPhotoUrl || '',
     transfer_receipt_url: transferReceiptUrl || ''
   };
-  
-  // 计算结算USDT
+
   const initialUsdt = transaction.deposit_amount / transaction.exchange_rate;
   const commission = initialUsdt * (transaction.commission_percentage / 100);
   transaction.settlement_usdt = initialUsdt - commission - transaction.transfer_fee;
-  
+
   return await base44.asServiceRole.entities.Transaction.create(transaction);
 }
 
-// ============= 批量处理函数 =============
+function buildSuccessMessage(transaction) {
+  let msg = `✅ <b>水单录入成功，请核对信息</b>\n\n`;
+  msg += `📝 编号: <code>${transaction.transaction_number}</code>\n`;
+  msg += `💵 查收金额: ${transaction.deposit_amount.toLocaleString()} ${transaction.currency}\n`;
+  msg += `🔢 汇款笔数: ${transaction.remittance_count || 1}笔\n`;
+  msg += `👤 汇款人: ${transaction.customer_name}`;
+  if (transaction.customer_age) {
+    msg += ` (${transaction.customer_age}岁)`;
+    if (transaction.customer_age >= 70) msg += ` ⚠️⚠️⚠️ <b>高龄客户提醒</b> ⚠️⚠️⚠️`;
+  }
+  if (transaction.customer_nationality) msg += ` [${transaction.customer_nationality}]`;
+  msg += `\n`;
+  msg += `🏢 收款账户名: ${transaction.receiving_account_name}\n`;
+  msg += `💳 收款账号: ${transaction.receiving_account_number}\n`;
+  msg += `💱 汇率: ${transaction.exchange_rate}\n`;
+  msg += `📊 点位: ${transaction.commission_percentage}% (${transaction.calculation_mode || '进算'})\n`;
+  msg += `📆 汇款日期: ${transaction.deposit_date}\n`;
+  msg += `⏳ 维护期: ${transaction.maintenance_days}天 (到期: ${transaction.maintenance_end_date})\n\n`;
+  msg += `✨ 如有误请在后台修改`;
+  return msg;
+}
 
-async function processBatch(base44, chatId) {
+// ============= 指令处理 =============
+
+async function handleChazhangCommand(chatId, messageId) {
   try {
-    // 1. 获取最近未处理的消息 (pending_batch 或 unread 且包含文件)
-    // 注意：Base44 SDK 列表查询可能需要根据实际支持的过滤语法调整
-    // 这里假设 .filter() 支持简单对象过滤。如果不支持复杂查询，可能需要 list 后过滤
-    const messages = await base44.asServiceRole.entities.TelegramMessage.list('-created_date', 50); // 获取最近50条消息
-    
-    // 过滤出当前chatId的、未处理的、有文件的消息
-    const batchMessages = messages.filter(m => 
-      m.chat_id === String(chatId) && 
+    const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+    const payload = `readonly:${expiresAt}`;
+    const key = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(BOT_TOKEN),
+      { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+    );
+    const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+    const sigHex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
+    const token = btoa(JSON.stringify({ expiresAt, sig: sigHex }))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    const viewUrl = `${APP_URL}/ReadOnlyView?token=${token}`;
+    await sendTelegramMessage(chatId,
+      `🔐 <b>账目查看链接已生成</b>\n\n📋 点击下方链接查看账目（只读模式）：\n${viewUrl}\n\n⏰ 链接有效期：<b>24小时</b>\n🔒 此链接仅供查看，无法修改任何数据`,
+      messageId
+    );
+  } catch (err) {
+    console.error('生成查账链接失败:', err);
+    await sendTelegramMessage(chatId, `❌ 生成链接失败: ${err.message}`, messageId);
+  }
+}
+
+async function handleReanalyzeCommand(base44, message, chatId, messageId, messageText) {
+  let targetMessageId = null;
+  if (message.reply_to_message) {
+    targetMessageId = String(message.reply_to_message.message_id);
+  } else {
+    const parts = messageText.split(' ');
+    if (parts.length > 1) targetMessageId = parts[1];
+  }
+
+  if (!targetMessageId) {
+    await sendTelegramMessage(chatId, `⚠️ 请回复一条带有图片的消息并发送 /reanalyze，或输入 /reanalyze [message_id]`, messageId);
+    return;
+  }
+
+  await sendTelegramMessage(chatId, `🔄 正在重新分析消息 ${targetMessageId}...`, messageId);
+  const msgs = await base44.asServiceRole.entities.TelegramMessage.list();
+  const targetMsg = msgs.find(m => m.message_id === targetMessageId && m.chat_id === String(chatId));
+
+  if (!targetMsg?.file_urls?.length) {
+    await sendTelegramMessage(chatId, `❌ 未找到该消息记录或该消息无文件`, messageId);
+    return;
+  }
+
+  const analysis = await analyzeImageContent(base44, targetMsg.file_urls[0]);
+  if (analysis?.data) {
+    await sendTelegramMessage(chatId, `✅ <b>重新分析结果</b>\n<pre>${JSON.stringify(analysis.data, null, 2)}</pre>`, messageId);
+  } else {
+    await sendTelegramMessage(chatId, `❌ 重新分析失败，未识别到内容`, messageId);
+  }
+}
+
+async function handleProcessBatch(base44, chatId, messageId) {
+  try {
+    const messages = await base44.asServiceRole.entities.TelegramMessage.list('-created_date', 50);
+    const batchMessages = messages.filter(m =>
+      m.chat_id === String(chatId) &&
       (m.status === 'pending_batch' || m.status === 'unread') &&
-      m.file_urls && m.file_urls.length > 0
-    ).slice(0, 10); // 限制处理最近10条，防止过多
+      m.file_urls?.length > 0
+    ).slice(0, 10);
 
     if (batchMessages.length === 0) {
       return "⚠️ 没有找到需要处理的文件消息。请确保先发送图片/文档，再发送 /process_batch";
@@ -491,615 +451,361 @@ async function processBatch(base44, chatId) {
 
     await sendTelegramMessage(chatId, `🔄 开始批量处理 ${batchMessages.length} 条消息...`);
 
-    // 2. 收集所有图片/文档 URL
-    let allImages = [];
-    batchMessages.forEach(msg => {
-      if (msg.file_urls) {
-        allImages = [...allImages, ...msg.file_urls];
-      }
-    });
-
+    const allImages = batchMessages.flatMap(m => m.file_urls || []);
     if (allImages.length === 0) return "⚠️ 未找到有效的文件链接";
 
-    // 3. 分析所有文件
-    let idCardData = null;
-    let receiptData = null;
-    let idCardUrl = '';
-    let receiptUrl = '';
-    let transactionData = {};
+    let idCardData = null, receiptData = null, idCardUrl = '', receiptUrl = '';
 
-    // 并行分析所有文件
-    const analysisPromises = allImages.map(async (url) => {
-      // 尝试作为图片分析
+    const analysisResults = await Promise.all(allImages.map(async (url) => {
       const analysis = await analyzeImageContent(base44, url);
-      if (analysis && analysis.data) {
-        return { type: 'image', url, result: analysis };
-      }
-      
-      // 尝试文档分析
+      if (analysis?.data) return { type: 'image', url, result: analysis };
       const docAnalysis = await analyzeDocument(base44, url);
-      if (docAnalysis && docAnalysis.data) {
-        return { type: 'document', url, result: docAnalysis };
-      }
-      
+      if (docAnalysis?.data) return { type: 'document', url, result: docAnalysis };
       return null;
-    });
-
-    const analysisResults = await Promise.all(analysisPromises);
+    }));
 
     for (const item of analysisResults) {
       if (!item) continue;
-      const { url, result } = item;
-      
       if (item.type === 'image') {
-        const type = result.data.image_type;
-        console.log(`🖼️ [批量] 识别结果: ${type} (${url})`);
-
-        if (type === 'id_card') {
-          idCardData = result.data;
-          idCardUrl = url;
-          if (idCardData.birth_date) {
-             const birthYear = parseInt(idCardData.birth_date.substring(0, 4));
-             if (!isNaN(birthYear)) {
-               idCardData.age = new Date().getFullYear() - birthYear;
-             }
-          }
-        } else if (type === 'transfer_receipt') {
-          if (!receiptData) {
-            receiptData = result.data;
-            receiptUrl = url;
-          }
-        } else {
-          if (!receiptData) {
-             receiptData = result.data;
-             receiptUrl = url;
-          }
+        const imgType = item.result.data.image_type;
+        console.log(`🖼️ [批量] 识别结果: ${imgType}`);
+        if (imgType === 'id_card' && !idCardData) {
+          idCardData = item.result.data;
+          idCardUrl = item.url;
+          const info = extractIdCardInfo(idCardData);
+          idCardData.age = info.age;
+        } else if (!receiptData) {
+          receiptData = item.result.data;
+          receiptUrl = item.url;
         }
-      } else if (item.type === 'document') {
-        if (!receiptData) {
-          receiptData = result.data;
-          receiptUrl = url;
-          console.log(`📄 [批量] 文档识别为水单`);
-        }
+      } else if (item.type === 'document' && !receiptData) {
+        receiptData = item.result.data;
+        receiptUrl = item.url;
       }
     }
 
-    // 4. 关联与合并数据
-    if (!receiptData && !idCardData) {
-      return "❌ 未能识别出有效的水单或证件信息。请重试或手动录入。";
-    }
+    if (!receiptData && !idCardData) return "❌ 未能识别出有效的水单或证件信息。请重试或手动录入。";
 
-    // 基础数据来自水单，补充数据来自证件
-    let mergedData = { ...receiptData };
-    
-    // 注入证件信息
+    const mergedData = { ...receiptData };
     if (idCardData) {
-      if (idCardData.name) mergedData.customer_name = idCardData.name;
-      if (idCardData.age) mergedData.customer_age = idCardData.age;
-      if (idCardData.nationality) mergedData.customer_nationality = idCardData.nationality;
+      const info = extractIdCardInfo(idCardData);
+      if (info.name) mergedData.customer_name = info.name;
+      if (info.age) mergedData.customer_age = info.age;
+      if (info.nationality) mergedData.customer_nationality = info.nationality;
     }
 
-    // 确保有金额和币种
     if (!mergedData.amount || !mergedData.currency) {
-      // 尝试再次从文本解析（如果有文本消息在 batchMessages 中）
-      // ...这里简化，直接返回提示
       return "⚠️ 识别到的信息不完整（缺少金额或币种）。已尝试关联，但数据不足。";
     }
 
-    // 格式转换
     const finalData = {
       deposit_amount: mergedData.amount,
       currency: mergedData.currency,
       customer_name: mergedData.customer_name,
+      customer_age: mergedData.customer_age,
+      customer_nationality: mergedData.customer_nationality,
       receiving_account_name: mergedData.receiving_account_name || mergedData.recipient_name,
       receiving_account_number: mergedData.receiving_account_number || mergedData.account_number,
       bank_name: mergedData.bank_name,
       deposit_date: mergedData.transfer_date || mergedData.date,
-      // 默认值
-      maintenance_days: 15,
-      commission_percentage: 13.5,
-      exchange_rate: 0.96
+      maintenance_days: 15, commission_percentage: 13.5, exchange_rate: 0.96
     };
-    
-    // 5. 创建交易
+
     const transaction = await createTransaction(
-      base44,
-      finalData,
-      chatId,
-      batchMessages[batchMessages.length - 1].message_id, // 使用最后一条消息ID
-      idCardUrl,
-      receiptUrl
+      base44, finalData, chatId,
+      batchMessages[batchMessages.length - 1].message_id,
+      idCardUrl, receiptUrl
     );
 
-    // 6. 更新消息状态为 processed
-    for (const msg of batchMessages) {
-       // 更新状态 (需确认 update 方法是否存在和权限)
-       try {
-         await base44.asServiceRole.entities.TelegramMessage.update(msg.id, { status: 'processed' });
-       } catch (e) {
-         console.error('更新消息状态失败:', e);
-       }
-    }
+    await Promise.allSettled(batchMessages.map(m =>
+      base44.asServiceRole.entities.TelegramMessage.update(m.id, { status: 'processed' })
+    ));
 
-    // 7. 构建回复
     let reply = `✅ <b>批量处理完成</b>\n\n`;
     if (idCardData && receiptData) {
       reply += `🔗 <b>已自动关联证件与水单</b>\n`;
       reply += `   证件: ${idCardData.name} (${idCardData.age || '?'}岁)\n`;
       reply += `   水单: ${finalData.deposit_amount} ${finalData.currency}\n\n`;
-    } else if (idCardData) {
-      reply += `⚠️ 仅识别到证件信息，未找到水单金额，无法创建完整交易。\n`;
-      return reply; // 没水单不创建交易? createTransaction 会失败或者缺字段。上方已校验。
     } else {
       reply += `⚠️ 未识别到证件，仅依据水单创建。\n\n`;
     }
-
     reply += `📝 编号: <code>${transaction.transaction_number}</code>\n`;
     reply += `💵 金额: ${transaction.deposit_amount.toLocaleString()} ${transaction.currency}\n`;
     if (finalData.customer_name) reply += `👤 客户: ${finalData.customer_name}\n`;
-    if (finalData.customer_age >= 70) reply += `⚠️ <b>高龄客户提醒</b> (${finalData.customer_age}岁)\n`;
+    if ((finalData.customer_age || 0) >= 70) reply += `⚠️ <b>高龄客户提醒</b> (${finalData.customer_age}岁)\n`;
 
     return reply;
-
   } catch (error) {
-    console.error("批量处理异常:", error);
+    console.error('❌ 批量处理异常:', error);
     return `❌ 批量处理失败: ${error.message}`;
   }
 }
 
-// ============= 主处理函数 =============
+// ============= 消息存档 =============
+
+async function archiveMessage(base44, { chatId, messageId, mediaGroupId, userName, messageText, allFileUrls, message, transferData, idCardPhotoUrl, extractedCustomerName, extractedAge, extractedNationality }) {
+  let category = 'other';
+  const tags = [];
+
+  if (messageText) {
+    if (messageText.includes('汇款') || messageText.includes('转账') || messageText.includes('水单')) {
+      category = 'transaction'; tags.push('transaction');
+    }
+    if (messageText.includes('你好') || messageText.includes('在吗')) {
+      category = 'inquiry'; tags.push('greeting');
+    }
+  }
+  if (allFileUrls.length > 0) {
+    tags.push('has_attachment');
+    if (message.document) tags.push('document');
+    if (message.photo?.length) tags.push('photo');
+  }
+
+  let analysisData = null;
+  if (transferData?.data) {
+    analysisData = transferData.data;
+  } else if (idCardPhotoUrl) {
+    analysisData = {
+      image_type: 'id_card',
+      name: extractedCustomerName,
+      birth_date: extractedAge ? String(new Date().getFullYear() - extractedAge) : null,
+      nationality: extractedNationality
+    };
+  }
+
+  await base44.asServiceRole.entities.TelegramMessage.create({
+    chat_id: String(chatId),
+    message_id: String(messageId),
+    media_group_id: mediaGroupId,
+    sender_name: userName,
+    content: messageText || (allFileUrls.length > 0 ? '[文件消息]' : '[未知消息]'),
+    file_urls: allFileUrls,
+    file_type: allFileUrls.length > 0 ? (message.document ? 'document' : 'photo') : 'text',
+    direction: 'incoming',
+    tags, category,
+    status: 'processed',
+    analysis_result: analysisData
+  });
+  console.log('💾 消息已存档');
+}
+
+// ============= 关联证件信息 =============
+
+async function linkIdCardInfo(base44, mergedData, chatId, mediaGroupId, currentIdCardUrl, extractedCustomerName, extractedAge) {
+  let linkedIdCardUrl = currentIdCardUrl;
+
+  // 优先注入当前消息中已提取的证件信息
+  if (extractedCustomerName) mergedData.customer_name = extractedCustomerName;
+  if (extractedAge) mergedData.customer_age = extractedAge;
+
+  // 若无当前证件信息，查找历史记录
+  if (!extractedCustomerName && !extractedAge) {
+    try {
+      const recentMsgs = await base44.asServiceRole.entities.TelegramMessage.list('-created_date', 30);
+      const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+
+      const targetIdCardMsg = recentMsgs.find(m => {
+        if (m.chat_id !== String(chatId)) return false;
+        if (m.analysis_result?.image_type !== 'id_card') return false;
+        if (mediaGroupId && m.media_group_id === mediaGroupId) return true;
+        return new Date(m.created_date).getTime() >= fiveMinutesAgo;
+      });
+
+      if (targetIdCardMsg?.analysis_result) {
+        console.log('🔗 自动关联到历史证件消息:', targetIdCardMsg.message_id);
+        const idData = targetIdCardMsg.analysis_result;
+        const info = extractIdCardInfo(idData);
+        if (info.name) mergedData.customer_name = info.name;
+        if (info.age) mergedData.customer_age = info.age;
+        if (info.nationality) mergedData.customer_nationality = info.nationality;
+        if (targetIdCardMsg.file_urls?.length) linkedIdCardUrl = targetIdCardMsg.file_urls[0];
+      }
+    } catch (e) {
+      console.error('❌ 查找关联证件失败:', e);
+    }
+  }
+
+  return linkedIdCardUrl;
+}
+
+// ============= 主入口 =============
 
 Deno.serve(async (req) => {
   console.log('\n=== 新的Telegram消息 ===');
-  
+
+  if (!BOT_TOKEN) {
+    console.error('❌ Bot Token未设置');
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  }
+
+  const base44 = createClientFromRequest(req);
+  const body = await req.json();
+
+  if (!body.message) return new Response(JSON.stringify({ ok: true }), { status: 200 });
+
+  const message = body.message;
+  const chatId = message.chat.id;
+  const messageId = message.message_id;
+  const messageText = message.text || message.caption || '';
+  const userName = message.from?.first_name || message.from?.username || '用户';
+  const mediaGroupId = message.media_group_id || null;
+
+  console.log('📨 消息来自:', userName, '| 文本:', messageText);
+
   try {
-    if (!BOT_TOKEN) {
-      console.error('❌ Bot Token未设置');
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    }
-    
-    const base44 = createClientFromRequest(req);
-    const body = await req.json();
-    
-    if (!body.message) {
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    }
-    
-    const message = body.message;
-    const chatId = message.chat.id;
-    const messageId = message.message_id;
-    const messageText = message.text || message.caption || '';
-    const userName = message.from?.first_name || message.from?.username || '用户';
-    const mediaGroupId = message.media_group_id || null;
-
-    console.log('📨 消息来自:', userName);
-    console.log('📝 消息文本:', messageText);
-    if (mediaGroupId) console.log('📦 Media Group ID:', mediaGroupId);
-    
-    // ============ 指令处理 ============
-
-    // 查账 指令：生成只读查看链接（内联 token 生成，无需 auth）
+    // ── 指令路由 ──
     if (messageText.trim() === '查账') {
-      try {
-        const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
-        const secret = BOT_TOKEN || "fallback-secret";
-        const payload = `readonly:${expiresAt}`;
-        const key = await crypto.subtle.importKey(
-          "raw", new TextEncoder().encode(secret),
-          { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-        );
-        const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
-        const sigHex = Array.from(new Uint8Array(signature)).map(b => b.toString(16).padStart(2, '0')).join('');
-        const tokenData = JSON.stringify({ expiresAt, sig: sigHex });
-        const token = btoa(tokenData).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
-        const viewUrl = `${APP_URL}/ReadOnlyView?token=${token}`;
-        
-        const msg = `🔐 <b>账目查看链接已生成</b>\n\n` +
-          `📋 点击下方链接查看账目（只读模式）：\n${viewUrl}\n\n` +
-          `⏰ 链接有效期：<b>24小时</b>\n` +
-          `🔒 此链接仅供查看，无法修改任何数据`;
-        await sendTelegramMessage(chatId, msg, messageId);
-      } catch (err) {
-        console.error('生成查账链接失败:', err);
-        await sendTelegramMessage(chatId, `❌ 生成链接失败: ${err.message}`, messageId);
-      }
+      await handleChazhangCommand(chatId, messageId);
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
 
     if (messageText.startsWith('/process_batch')) {
-      const resultMsg = await processBatch(base44, chatId);
+      const resultMsg = await handleProcessBatch(base44, chatId, messageId);
       await sendTelegramMessage(chatId, resultMsg, messageId);
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
 
     if (messageText.startsWith('/reanalyze')) {
-      // 逻辑: 提取目标 message_id (用户可能回复某条消息，或者输入ID)
-      let targetMessageId = null;
-      if (message.reply_to_message) {
-        targetMessageId = String(message.reply_to_message.message_id);
-      } else {
-        const parts = messageText.split(' ');
-        if (parts.length > 1) targetMessageId = parts[1];
-      }
-
-      if (targetMessageId) {
-        await sendTelegramMessage(chatId, `🔄 正在重新分析消息 ${targetMessageId}...`, messageId);
-        // 查找消息记录
-        const msgs = await base44.asServiceRole.entities.TelegramMessage.list();
-        const targetMsg = msgs.find(m => m.message_id === targetMessageId && m.chat_id === String(chatId));
-        
-        if (targetMsg && targetMsg.file_urls && targetMsg.file_urls.length > 0) {
-           // 简单的重分析：当作单条处理
-           // 为简化，直接调用 processBatch 但只限定这一条? 或者复用 analyzeImageContent
-           // 这里简单演示对第一张图的重分析
-           const url = targetMsg.file_urls[0];
-           const analysis = await analyzeImageContent(base44, url);
-           if (analysis && analysis.data) {
-             await sendTelegramMessage(chatId, `✅ <b>重新分析结果</b>\n<pre>${JSON.stringify(analysis.data, null, 2)}</pre>`, messageId);
-           } else {
-             await sendTelegramMessage(chatId, `❌ 重新分析失败，未识别到内容`, messageId);
-           }
-        } else {
-           await sendTelegramMessage(chatId, `❌ 未找到该消息记录或该消息无文件`, messageId);
-        }
-      } else {
-        await sendTelegramMessage(chatId, `⚠️ 请回复一条带有图片的消息并发送 /reanalyze，或输入 /reanalyze [message_id]`, messageId);
-      }
+      await handleReanalyzeCommand(base44, message, chatId, messageId, messageText);
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
 
-    // 收集所有图片和文档
-    const photos = [];
-    const allFileUrls = []; // 收集所有文件链接
-    
-    if (message.photo && message.photo.length > 0) {
-      photos.push(message.photo[message.photo.length - 1].file_id);
-    }
+    // ── 收集媒体 ──
+    const photos = message.photo?.length ? [message.photo[message.photo.length - 1].file_id] : [];
+    const hasKeywordsEarly = TRANSACTION_KEYWORDS.some(k => messageText.includes(k));
 
-    // 🆕 提前检测关键词（用于图片处理阶段判断是否主动询问）
-    const transactionKeywords = ['汇款', '转账', '水单', '汇款单', '收款'];
-    const hasKeywordsEarly = transactionKeywords.some(k => messageText.includes(k));
-    
-    // 1. 处理图片
-    let idCardPhotoUrl = '';
-    let transferReceiptUrl = '';
-    let transferData = null;
-    let extractedCustomerName = '';
-    let extractedAge = null;
-    let extractedNationality = '';
+    // ── 处理图片 ──
+    let idCardPhotoUrl = '', transferReceiptUrl = '', transferData = null;
+    let extractedCustomerName = '', extractedAge = null, extractedNationality = '';
+    const allFileUrls = [];
 
-    // 并行处理所有图片以提升速度
-    const photoProcessingPromises = photos.map(async (photoId) => {
+    const photoResults = await Promise.all(photos.map(async (photoId) => {
       try {
-        const imageBlob = await downloadTelegramFile(photoId);
-        
-        const uploadResult = await base44.asServiceRole.integrations.Core.UploadFile({
-          file: imageBlob
-        });
-        const imageUrl = uploadResult.file_url;
-        
-        // 智能分析图片内容 (区分证件或水单)
-        const analysis = await analyzeImageContent(base44, imageUrl);
-        
-        return { imageUrl, analysis };
-      } catch (error) {
-        console.error('❌ 图片处理失败:', error);
+        const blob = await downloadTelegramFile(photoId);
+        const { file_url } = await base44.asServiceRole.integrations.Core.UploadFile({ file: blob });
+        const analysis = await analyzeImageContent(base44, file_url);
+        return { imageUrl: file_url, analysis };
+      } catch (err) {
+        console.error('❌ 图片处理失败:', err);
         return null;
       }
-    });
+    }));
 
-    const photoResults = await Promise.all(photoProcessingPromises);
-
-    // 处理分析结果
     for (const result of photoResults) {
       if (!result) continue;
       const { imageUrl, analysis } = result;
       allFileUrls.push(imageUrl);
 
-      if (analysis && analysis.data) {
-        const type = analysis.data.image_type;
-        console.log(`🖼️ 图片识别为: ${type}`);
-        
-        if (type === 'id_card') {
-          idCardPhotoUrl = imageUrl;
-          if (analysis.data.name) extractedCustomerName = analysis.data.name;
-          if (analysis.data.birth_date) {
-            const birthYear = parseInt(analysis.data.birth_date.substring(0, 4));
-            if (!isNaN(birthYear)) {
-              extractedAge = new Date().getFullYear() - birthYear;
-            }
-          }
-          if (analysis.data.nationality) extractedNationality = analysis.data.nationality;
-          
-          // 🆕 仅有证件照，无水单关键词 → 主动询问用途
-          if (!hasKeywordsEarly && photos.length === 1 && !messageText && !message.document) {
-            const idName = extractedCustomerName ? `（${extractedCustomerName}）` : '';
-            await sendTelegramMessage(
-              chatId,
-              `🪪 <b>检测到证件照片${idName}</b>\n\n` +
-              `请问这张证件照片的用途是：\n` +
-              `1️⃣ 客户身份核验（KYC）\n` +
-              `2️⃣ 关联某笔汇款交易\n\n` +
-              `如需关联交易，请在发送证件时同时发送水单，或回复相关水单消息。\n` +
-              `证件信息已记录，下次发送水单时会自动关联。`,
-              messageId
-            );
-          }
-        } else if (type === 'transfer_receipt') {
+      if (!analysis?.data) continue;
+      const imgType = analysis.data.image_type;
+      console.log(`🖼️ 图片识别为: ${imgType}`);
+
+      if (imgType === 'id_card') {
+        idCardPhotoUrl = imageUrl;
+        const info = extractIdCardInfo(analysis.data);
+        extractedCustomerName = info.name;
+        extractedAge = info.age;
+        extractedNationality = info.nationality;
+
+        if (!hasKeywordsEarly && photos.length === 1 && !messageText && !message.document) {
+          const idName = extractedCustomerName ? `（${extractedCustomerName}）` : '';
+          await sendTelegramMessage(chatId,
+            `🪪 <b>检测到证件照片${idName}</b>\n\n请问这张证件照片的用途是：\n1️⃣ 客户身份核验（KYC）\n2️⃣ 关联某笔汇款交易\n\n如需关联交易，请在发送证件时同时发送水单，或回复相关水单消息。\n证件信息已记录，下次发送水单时会自动关联。`,
+            messageId
+          );
+        }
+      } else {
+        if (!transferData) {
+          transferData = { imageUrl, data: analysis.data };
           transferReceiptUrl = imageUrl;
-          if (!transferData) {
-             transferData = { imageUrl, data: analysis.data };
-          }
-        } else {
-           // 默认为水单处理，防止漏判
-           if (!transferData) {
-             transferData = { imageUrl, data: analysis.data };
-             transferReceiptUrl = imageUrl;
-           }
         }
       }
     }
 
-    // 2. 处理文档 (PDF, Word, etc.)
+    // ── 处理文档 ──
     if (message.document) {
       try {
         console.log('📄 检测到文档:', message.document.file_name);
-        const docFileId = message.document.file_id;
-        const docBlob = await downloadTelegramFile(docFileId);
-        
-        const uploadResult = await base44.asServiceRole.integrations.Core.UploadFile({
-          file: docBlob
-        });
-        const docUrl = uploadResult.file_url;
-        allFileUrls.push(docUrl);
-
-        // 尝试作为水单分析
-        const mimeType = message.document.mime_type || '';
+        const blob = await downloadTelegramFile(message.document.file_id);
+        const { file_url } = await base44.asServiceRole.integrations.Core.UploadFile({ file: blob });
+        allFileUrls.push(file_url);
         if (!transferData) {
-           console.log('🤖 尝试分析文档内容...');
-           const analysis = await analyzeDocument(base44, docUrl);
-           if (analysis) {
-             transferData = analysis;
-             if (!transferReceiptUrl) transferReceiptUrl = docUrl;
-           }
+          const analysis = await analyzeDocument(base44, file_url);
+          if (analysis) { transferData = analysis; transferReceiptUrl = file_url; }
         }
-      } catch (error) {
-        console.error('❌ 文档处理失败:', error);
+      } catch (err) {
+        console.error('❌ 文档处理失败:', err);
       }
     }
 
-    // 3. 保存消息记录 (双向同步基础)
+    // ── 存档消息 ──
     try {
-      let category = 'other';
-      let tags = [];
-      
-      if (messageText) {
-        if (messageText.includes('汇款') || messageText.includes('转账') || messageText.includes('水单')) {
-          category = 'transaction';
-          tags.push('transaction');
-        }
-        if (messageText.includes('你好') || messageText.includes('在吗')) {
-          category = 'inquiry';
-          tags.push('greeting');
-        }
-      }
-      if (allFileUrls.length > 0) {
-        tags.push('has_attachment');
-        if (message.document) tags.push('document');
-        if (photos.length > 0) tags.push('photo');
-      }
-
-      // 准备分析结果数据
-      let analysisData = null;
-      if (transferData && transferData.data) {
-        analysisData = transferData.data;
-      } else if (idCardPhotoUrl) {
-         // 重新构建证件的 analysis data
-         analysisData = {
-           image_type: 'id_card',
-           name: extractedCustomerName,
-           birth_date: extractedAge ? (new Date().getFullYear() - extractedAge).toString() : null, // 估算年份
-           nationality: extractedNationality
-         };
-      }
-
-      await base44.asServiceRole.entities.TelegramMessage.create({
-        chat_id: String(chatId),
-        message_id: String(messageId),
-        media_group_id: mediaGroupId,
-        sender_name: userName,
-        content: messageText || (allFileUrls.length > 0 ? '[文件消息]' : '[未知消息]'),
-        file_urls: allFileUrls,
-        file_type: allFileUrls.length > 0 ? (message.document ? 'document' : 'photo') : 'text',
-        direction: 'incoming',
-        tags: tags,
-        category: category,
-        status: 'processed', // 自动处理
-        analysis_result: analysisData
+      await archiveMessage(base44, {
+        chatId, messageId, mediaGroupId, userName, messageText, allFileUrls,
+        message, transferData, idCardPhotoUrl,
+        extractedCustomerName, extractedAge, extractedNationality
       });
-      console.log('💾 消息已存档');
-    } catch (error) {
-      console.error('❌ 消息存档失败:', error);
+    } catch (err) {
+      console.error('❌ 消息存档失败:', err);
     }
 
-    // 4. 检查是否需要继续处理为交易
-    
-    // 如果是 Media Group，为了提高关联成功率（让证件消息先入库），稍微延迟处理水单
-    if (mediaGroupId) {
-       await new Promise(resolve => setTimeout(resolve, 2000));
-    }
+    // ── 判断是否需要处理为交易 ──
+    if (mediaGroupId) await new Promise(r => setTimeout(r, 2000));
 
-    // 必须有图片或文本
-    if (photos.length === 0 && !messageText && !message.document) {
+    if (!photos.length && !messageText && !message.document) {
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
-    
-    // 🆕 增强关键词检测 - 汇款/转账触发词 + 附件识别
-    const transactionTriggerKeywords = ['汇款', '转账', '水单', '汇款单', '币种', '金额', '查收', '收款', '维护期', 'IBAN', '银行', '账户'];
-    const hasKeywords = transactionTriggerKeywords.some(k => messageText.toLowerCase().includes(k.toLowerCase()));
-    
-    // 若消息包含"水单"/"转账"/"汇款"关键词但没有附件，纯文本也触发处理
-    const isPureTextTransaction = hasKeywords && photos.length === 0 && !message.document;
-    
-    // 若识别到附件是转账单 → 自动触发
+
+    const hasKeywords = TRANSACTION_TRIGGER_KEYWORDS.some(k => messageText.toLowerCase().includes(k.toLowerCase()));
     const isAutoTriggered = !!transferData;
-    
-    // 如果只是普通聊天或仅有证件，不继续处理
+
     if (!hasKeywords && !isAutoTriggered) {
-       console.log('ℹ️ 仅存档消息，非交易指令');
-       return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      console.log('ℹ️ 仅存档消息，非交易指令');
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
 
-    // 如果是水单，发送处理中提示
     const triggerReason = isAutoTriggered ? '检测到转账单附件' : '检测到汇款关键词';
     await sendTelegramMessage(chatId, `🔄 ${triggerReason}，正在自动处理水单信息...`, messageId);
-    
-    // 解析文本 (优先使用正则，如果关键信息缺失，尝试LLM分析)
+
+    // ── 解析文本 ──
     let textData = parseWaterSlip(messageText);
-    
-    // 如果正则解析缺少关键信息且有足够文本长度，尝试LLM分析文本
-    // 注：新的parseWaterSlip已经涵盖了大部分字段解析，这里保留LLM作为兜底
-
     if ((!textData.deposit_amount || !textData.currency) && messageText.length > 10) {
-      console.log('🤔 正则解析不完整，尝试LLM分析文本...');
-      const llmTextData = await analyzeText(base44, messageText);
-      if (llmTextData) {
-        console.log('🤖 LLM文本分析结果:', llmTextData);
-        // 合并LLM结果 (LLM结果优先于正则，因为更智能)
-        textData = { ...textData, ...llmTextData };
-      }
+      console.log('🤔 正则解析不完整，尝试LLM分析...');
+      const llmData = await analyzeTextWithLLM(base44, messageText);
+      if (llmData) { console.log('🤖 LLM结果:', llmData); textData = { ...textData, ...llmData }; }
     }
 
-    console.log('📝 最终文本数据:', textData);
-    
-    // 合并数据
-    const mergedData = mergeData(transferData, textData);
-    
-    // 尝试寻找关联的证件信息 (当前消息提取的 或 历史消息关联的)
-    let linkedIdCardUrl = idCardPhotoUrl;
+    // ── 合并与关联 ──
+    const mergedData = mergeTransferData(transferData, textData);
+    const linkedIdCardUrl = await linkIdCardInfo(
+      base44, mergedData, chatId, mediaGroupId,
+      idCardPhotoUrl, extractedCustomerName, extractedAge
+    );
 
-    // 1. 优先使用当前消息提取的证件信息
-    if (extractedCustomerName) {
-      mergedData.customer_name = extractedCustomerName;
-    }
-    if (extractedAge) {
-      mergedData.customer_age = extractedAge;
-    }
-    if (extractedNationality) {
-      mergedData.customer_nationality = extractedNationality;
-    }
-
-    // 2. 如果当前消息没有证件信息，尝试查找同组(Media Group)或最近5分钟的证件消息
-    if (!extractedCustomerName && !extractedAge) {
-       try {
-         const recentMsgs = await base44.asServiceRole.entities.TelegramMessage.list('-created_date', 30);
-         const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-         
-         const targetIdCardMsg = recentMsgs.find(m => {
-           if (m.chat_id !== String(chatId)) return false;
-           if (!m.analysis_result || m.analysis_result.image_type !== 'id_card') return false;
-           
-           // A. Media Group 匹配（最优先）
-           if (mediaGroupId && m.media_group_id === mediaGroupId) return true;
-           
-           // B. 时间匹配：5分钟内的证件照才关联
-           const msgTime = new Date(m.created_date).getTime();
-           return msgTime >= fiveMinutesAgo;
-         });
-
-         if (targetIdCardMsg && targetIdCardMsg.analysis_result) {
-            console.log('🔗 自动关联到历史证件消息:', targetIdCardMsg.message_id);
-            const idData = targetIdCardMsg.analysis_result;
-            
-            if (idData.name) mergedData.customer_name = idData.name;
-            // 处理年龄
-            if (idData.birth_date) {
-               const birthYear = parseInt(idData.birth_date.substring(0, 4));
-               if (!isNaN(birthYear)) {
-                 mergedData.customer_age = new Date().getFullYear() - birthYear;
-               }
-            } else if (idData.age) {
-               mergedData.customer_age = idData.age;
-            }
-            if (idData.nationality) mergedData.customer_nationality = idData.nationality;
-            
-            // 关联证件图片URL
-            if (targetIdCardMsg.file_urls && targetIdCardMsg.file_urls.length > 0) {
-               linkedIdCardUrl = targetIdCardMsg.file_urls[0];
-            }
-         }
-       } catch (e) {
-         console.error('查找关联证件失败:', e);
-       }
-    }
-    
     console.log('📊 合并后数据:', mergedData);
-    
-    // 验证必要字段
+
     if (!mergedData.deposit_amount || !mergedData.currency) {
-      await sendTelegramMessage(
-        chatId,
+      await sendTelegramMessage(chatId,
         '❌ <b>信息不完整</b>\n\n缺少必要信息（金额或币种）\n\n请确保：\n1. 转账单图片/文档清晰\n2. 或在文本中提供金额和币种\n3. 或检查图片是否模糊',
         messageId
       );
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
-    
-    // 创建交易
+
+    // ── 创建交易 ──
     try {
-      const transaction = await createTransaction(
-        base44, 
-        mergedData, 
-        chatId, 
-        messageId, 
-        linkedIdCardUrl, 
-        transferReceiptUrl
-      );
-      
-      // 生成成功消息
-      let successMsg = `✅ <b>水单录入成功，请核对信息</b>\n\n`;
-      successMsg += `📝 编号: <code>${transaction.transaction_number}</code>\n`;
-      successMsg += `💵 查收金额: ${transaction.deposit_amount.toLocaleString()} ${transaction.currency}\n`;
-      successMsg += `🔢 汇款笔数: ${transaction.remittance_count || 1}笔\n`;
-      successMsg += `👤 汇款人: ${transaction.customer_name}`;
-      if (transaction.customer_age) {
-        successMsg += ` (${transaction.customer_age}岁)`;
-        if (transaction.customer_age >= 70) {
-          successMsg += ` ⚠️⚠️⚠️ <b>高龄客户提醒</b> ⚠️⚠️⚠️`;
-        }
-      }
-      if (transaction.customer_nationality) successMsg += ` [${transaction.customer_nationality}]`;
-      successMsg += `\n`;
-      successMsg += `🏢 收款账户名: ${transaction.receiving_account_name}\n`;
-      successMsg += `💳 收款账号: ${transaction.receiving_account_number}\n`;
-      successMsg += `💱 汇率: ${transaction.exchange_rate}\n`;
-      successMsg += `📊 点位: ${transaction.commission_percentage}% (${transaction.calculation_mode || '进算'})\n`;
-      successMsg += `📆 汇款日期: ${transaction.deposit_date}\n`;
-      successMsg += `⏳ 维护期: ${transaction.maintenance_days}天 (到期: ${transaction.maintenance_end_date})\n\n`;
-      successMsg += `✨ 如有误请在后台修改`;
-      
+      const transaction = await createTransaction(base44, mergedData, chatId, messageId, linkedIdCardUrl, transferReceiptUrl);
+      const successMsg = buildSuccessMessage(transaction);
       await sendTelegramMessage(chatId, successMsg, messageId);
-      
-      // 广播通知到其他群（排除原始发送群）
-      for (const broadcastId of BROADCAST_CHAT_IDS) {
-        if (broadcastId !== String(chatId)) {
-          await sendTelegramMessage(broadcastId, successMsg);
-        }
-      }
-      
+      await broadcastMessage(chatId, successMsg);
       console.log('✅ 交易创建完成');
-      
-    } catch (error) {
-      console.error('❌ 创建交易失败:', error);
-      await sendTelegramMessage(
-        chatId,
-        `❌ <b>录入失败</b>\n\n${error.message}\n\n请联系管理员`,
-        messageId
-      );
+    } catch (err) {
+      console.error('❌ 创建交易失败:', err);
+      await sendTelegramMessage(chatId, `❌ <b>录入失败</b>\n\n${err.message}\n\n请联系管理员`, messageId);
     }
-    
+
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    
+
   } catch (error) {
     console.error('❌ 处理失败:', error);
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
