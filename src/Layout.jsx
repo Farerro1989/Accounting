@@ -52,7 +52,7 @@ export default function Layout({ children, currentPageName }) {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const currentUser = await User.me();
+        const currentUser = await base44.auth.me();
         setUser(currentUser);
       } catch (error) {
         console.error("无法获取用户信息", error);
