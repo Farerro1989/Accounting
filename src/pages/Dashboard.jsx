@@ -53,7 +53,7 @@ export default function Dashboard() {
     init();
   }, []);
 
-  const permissions = React.useMemo(() => {
+  const permissions = useMemo(() => {
     if (!currentUser) return {};
     if (currentUser.role === 'admin') {
       return { 
