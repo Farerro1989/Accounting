@@ -1,12 +1,13 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { createPageUrl } from "@/utils";
-import { LayoutDashboard, CreditCard, Wallet } from "lucide-react";
+import { LayoutDashboard, CreditCard, Wallet, UserCircle } from "lucide-react";
 
 const tabs = [
   { title: "仪表盘", url: createPageUrl("Dashboard"), icon: LayoutDashboard },
   { title: "交易", url: createPageUrl("Transactions"), icon: CreditCard },
   { title: "记账", url: createPageUrl("ExpenseDashboard"), icon: Wallet },
+  { title: "我的", url: createPageUrl("Profile"), icon: UserCircle },
 ];
 
 export default function BottomTabBar() {
