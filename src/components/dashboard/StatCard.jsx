@@ -49,7 +49,7 @@ const colorVariants = {
 };
 
 export default function StatCard({ title, value, description, icon: Icon, color = "blue", loading = false, onClick, isClickable = false }) {
-  const variant = colorVariants[color];
+  const variant = colorVariants[color] || colorVariants.blue;
 
   return (
     <motion.div
