@@ -23,9 +23,13 @@ import CustomerStatsChart from "../components/dashboard/CustomerStatsChart";
 export default function Dashboard() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [timeFilter, setTimeFilter] = useState("all");
-  const [selectedQuarter, setSelectedQuarter] = useState("Q1");
-  const [selectedYear, setSelectedYear] = useState("2025");
+  const now = new Date();
+  const [dateFilter, setDateFilter] = useState({
+    filterMode: "month",
+    year: String(now.getFullYear()),
+    month: String(now.getMonth() + 1),
+    day: String(now.getDate()),
+  });
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
