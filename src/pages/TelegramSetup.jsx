@@ -390,50 +390,104 @@ export default function TelegramSetup() {
           </CardContent>
         </Card>
 
-        {/* 使用指南 */}
+        {/* ========== 机器人命令大全 ========== */}
         <Card className="bg-white/80 backdrop-blur-sm border border-slate-200 shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MousePointerClick className="w-5 h-5 text-indigo-600" />
+              结算机器人命令大全
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              {[
+                { cmd: "查账", desc: "生成24小时只读查账链接，分享给需要查看账目的人", type: "🔐" },
+                { cmd: "/process_batch", desc: "批量处理当前群组最近未处理的图片/文档，自动关联证件与水单", type: "📦" },
+                { cmd: "/reanalyze [消息ID]", desc: "重新分析指定消息的图片内容（也可回复该消息发送此命令）", type: "🔄" },
+              ].map(item => (
+                <div key={item.cmd} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">{item.type}</span>
+                    <div>
+                      <code className="text-sm font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">{item.cmd}</code>
+                      <p className="text-sm text-slate-600 mt-1">{item.desc}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-emerald-200">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🤖</span>
+                  <div>
+                    <code className="text-sm font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">自动触发（无需命令）</code>
+                    <p className="text-sm text-slate-600 mt-1">发送含「汇款」「转账」「水单」关键词的文本、或上传转账单图片/PDF，自动识别并录入交易</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <h4 className="font-semibold text-slate-700">🤖 AI 自动识别规则</h4>
+              <div className="grid md:grid-cols-2 gap-3 text-sm">
+                <div className="bg-white p-3 rounded border space-y-1">
+                  <p className="font-medium text-slate-800">📸 图片识别</p>
+                  <ul className="text-slate-600 space-y-1 list-disc list-inside text-xs">
+                    <li>自动判断：证件照 vs 转账水单</li>
+                    <li>证件照 → 提取姓名、年龄、国籍</li>
+                    <li>水单 → 提取金额、币种、收款方</li>
+                    <li>证件+水单同时发送 → 自动关联</li>
+                    <li>5分钟内先发的证件会自动匹配后发的水单</li>
+                  </ul>
+                </div>
+                <div className="bg-white p-3 rounded border space-y-1">
+                  <p className="font-medium text-slate-800">📝 文本识别</p>
+                  <ul className="text-slate-600 space-y-1 list-disc list-inside text-xs">
+                    <li>支持标准格式（见下方模板）</li>
+                    <li>正则解析 + AI兜底双重保障</li>
+                    <li>自动填充默认值（汇率、点位等）</li>
+                    <li>高龄客户（≥70岁）自动预警</li>
+                    <li>仅有证件照时主动询问用途</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 使用指南 */}
+        <Card className="bg-white/80 backdrop-blur-sm border border-slate-200 shadow-lg">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
               使用指南
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Alert className="bg-blue-50 border-blue-200 mb-6">
-              <CheckCircle className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800">
-                <p className="font-semibold mb-2">✅ 完成设置！</p>
-                <p className="text-sm">现在两个机器人已配置完成，可以开始使用了！</p>
-              </AlertDescription>
-            </Alert>
-
             <div className="grid md:grid-cols-2 gap-6">
-              {/* 结算机器人使用 */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-blue-700 flex items-center gap-2">
                   <CreditCard className="w-4 h-4" /> 结算机器人
                 </h4>
-                <p className="text-sm text-slate-600">用于自动记录客户转账水单。</p>
                 <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700 pl-4">
-                  <li>添加机器人到结算群组。</li>
-                  <li>发送包含转账信息的文本（可参考测试模板）。</li>
-                  <li>上传证件照和转账单（机器人会进行AI分析和匹配）。</li>
-                  <li>机器人自动录入系统并回复确认。</li>
+                  <li>添加机器人到结算群组并关闭隐私模式</li>
+                  <li>发送含汇款关键词的文本，或上传转账单图片</li>
+                  <li>可同时或提前5分钟发送证件照（自动关联）</li>
+                  <li>机器人自动录入并回复确认，如有误到后台修改</li>
+                  <li>发送「查账」获取只读查账链接</li>
                 </ol>
               </div>
-
-              {/* 开销机器人使用 */}
               <div className="space-y-3">
                 <h4 className="font-semibold text-emerald-700 flex items-center gap-2">
                   <Wallet className="w-4 h-4" /> 开销机器人
                 </h4>
-                <p className="text-sm text-slate-600">用于自动记录日常消费账目。</p>
                 <ol className="list-decimal list-inside space-y-2 text-sm text-slate-700 pl-4">
-                  <li>添加机器人到记账群组或直接与机器人对话。</li>
-                  <li>拍照上传消费小票或发送消费文本（可参考测试模板）。</li>
-                  <li>AI自动识别金额、币种、商家信息等。</li>
-                  <li>自动获取实时汇率并转换为USDT（+1%）保存。</li>
-                  <li>自动保存到开销系统。</li>
+                  <li>添加机器人到记账群组或直接私聊</li>
+                  <li>拍照上传消费小票或发送消费文本</li>
+                  <li>AI自动识别金额、币种、商家信息</li>
+                  <li>自动获取实时汇率转换为USDT（+1%）</li>
+                  <li>自动保存到开销系统</li>
                 </ol>
               </div>
             </div>

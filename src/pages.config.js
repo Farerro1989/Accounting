@@ -58,12 +58,12 @@ import ExpenseList from './pages/ExpenseList';
 import ExpenseReports from './pages/ExpenseReports';
 import Home from './pages/Home';
 import ProfitDetails from './pages/ProfitDetails';
+import ReadOnlyView from './pages/ReadOnlyView';
 import SystemSelector from './pages/SystemSelector';
 import TelegramMessages from './pages/TelegramMessages';
 import TelegramSetup from './pages/TelegramSetup';
 import Transactions from './pages/Transactions';
 import UserManagement from './pages/UserManagement';
-import ReadOnlyView from './pages/ReadOnlyView';
 import __Layout from './Layout.jsx';
 
 
@@ -79,12 +79,12 @@ export const PAGES = {
     "ExpenseReports": ExpenseReports,
     "Home": Home,
     "ProfitDetails": ProfitDetails,
+    "ReadOnlyView": ReadOnlyView,
     "SystemSelector": SystemSelector,
     "TelegramMessages": TelegramMessages,
     "TelegramSetup": TelegramSetup,
     "Transactions": Transactions,
     "UserManagement": UserManagement,
-    "ReadOnlyView": ReadOnlyView,
 }
 
 export const pagesConfig = {
