@@ -1079,6 +1079,14 @@ Deno.serve(async (req) => {
       successMsg += `✨ 如有误请在后台修改`;
       
       await sendTelegramMessage(chatId, successMsg, messageId);
+      
+      // 广播通知到其他群（排除原始发送群）
+      for (const broadcastId of BROADCAST_CHAT_IDS) {
+        if (broadcastId !== String(chatId)) {
+          await sendTelegramMessage(broadcastId, successMsg);
+        }
+      }
+      
       console.log('✅ 交易创建完成');
       
     } catch (error) {
