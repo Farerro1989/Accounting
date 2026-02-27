@@ -47,6 +47,7 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
+import AIReport from './pages/AIReport';
 import AccountDetail from './pages/AccountDetail';
 import Analytics from './pages/Analytics';
 import Dashboard from './pages/Dashboard';
@@ -62,11 +63,12 @@ import TelegramMessages from './pages/TelegramMessages';
 import TelegramSetup from './pages/TelegramSetup';
 import Transactions from './pages/Transactions';
 import UserManagement from './pages/UserManagement';
-import AIReport from './pages/AIReport';
+import ReadOnlyView from './pages/ReadOnlyView';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
+    "AIReport": AIReport,
     "AccountDetail": AccountDetail,
     "Analytics": Analytics,
     "Dashboard": Dashboard,
@@ -82,7 +84,7 @@ export const PAGES = {
     "TelegramSetup": TelegramSetup,
     "Transactions": Transactions,
     "UserManagement": UserManagement,
-    "AIReport": AIReport,
+    "ReadOnlyView": ReadOnlyView,
 }
 
 export const pagesConfig = {
