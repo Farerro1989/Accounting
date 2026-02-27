@@ -124,12 +124,14 @@ export default function Dashboard() {
   const calculateProfitMetrics = () => {
     const filteredTransactions = getFilteredTransactions();
 
+    // Actual (completed only)
     let totalCommission = 0;
     let totalTransferFee = 0;
     let totalExchangeRateProfit = 0;
     let totalViolationPenalty = 0;
     let completedCount = 0;
 
+    // Estimated (all valid, excluding returned/frozen-cannot)
     let estimatedCommission = 0;
     let estimatedTransferFee = 0;
     let estimatedExchangeRateProfit = 0;
@@ -138,54 +140,58 @@ export default function Dashboard() {
     let totalFrozenFunds = 0;
 
     for (const t of filteredTransactions) {
-      // 1. Violation Penalty counts for ALL transactions (including Frozen/Returned)
+      const depositAmount = parseFloat(t.deposit_amount) || 0;
+      const exchangeRate = parseFloat(t.exchange_rate) || 0;
+      // transfer_fee is already in USDT (fixed fee, not in native currency)
+      const feeUsdt = parseFloat(t.transfer_fee) || 0;
       const violationPenalty = parseFloat(t.violation_penalty) || 0;
+
+      // Returned: only count violation penalty
+      if (t.fund_status === '已退回') {
+        totalViolationPenalty += violationPenalty;
+        estimatedViolationPenalty += violationPenalty;
+        continue;
+      }
+
+      // Frozen (Cannot Process): track frozen funds + penalty, skip profit
+      if (t.fund_status === '冻结（不能处理）') {
+        if (depositAmount > 0 && exchangeRate > 0) {
+          totalFrozenFunds += depositAmount / exchangeRate;
+        }
+        totalViolationPenalty += violationPenalty;
+        estimatedViolationPenalty += violationPenalty;
+        continue;
+      }
+
+      // Frozen (Processing): track frozen funds + penalty, skip profit
+      if (t.fund_status === '冻结（正在处理）') {
+        if (depositAmount > 0 && exchangeRate > 0) {
+          totalFrozenFunds += depositAmount / exchangeRate;
+        }
+        totalViolationPenalty += violationPenalty;
+        estimatedViolationPenalty += violationPenalty;
+        continue;
+      }
+
+      // Skip invalid data
+      if (depositAmount <= 0 || exchangeRate <= 0) continue;
+
+      // Commission is calculated on native amount, then converted to USDT
+      const commissionPct = parseFloat(t.commission_percentage) || 0;
+      const commNative = depositAmount * (commissionPct / 100);
+      const commissionUsdt = commNative / exchangeRate;
+
+      const initialUsdt = depositAmount / exchangeRate; // gross USDT before any deductions
+
+      // Penalty always counted
       totalViolationPenalty += violationPenalty;
       estimatedViolationPenalty += violationPenalty;
 
-      // Handle special statuses that should be excluded from profit calculations
-      const depositAmount = parseFloat(t.deposit_amount);
-      const exchangeRate = parseFloat(t.exchange_rate);
-
-      // Returned: Skip completely
-      if (t.fund_status === '已退回') continue;
-
-      // Frozen (Cannot Process): Track funds but skip profit
-      if (t.fund_status === '冻结（不能处理）') {
-        if (depositAmount && exchangeRate && exchangeRate !== 0) {
-          totalFrozenFunds += depositAmount / exchangeRate;
-        }
-        continue; 
-      }
-
-      // Frozen (Processing): Skip profit calculations
-      if (t.fund_status === '冻结（正在处理）') {
-        if (depositAmount && exchangeRate && exchangeRate !== 0) {
-          totalFrozenFunds += depositAmount / exchangeRate;
-        }
-        continue;
-      }
-
-      if (!depositAmount || !exchangeRate || exchangeRate === 0) {
-        continue;
-      }
-
-      const feeNative = parseFloat(t.transfer_fee) || 0;
-      const commNative = depositAmount * ((parseFloat(t.commission_percentage) || 0) / 100);
-
-      // USDT conversions
-      const commissionUsdt = commNative / exchangeRate;
-      const feeUsdt = feeNative / exchangeRate;
-      const initialUsdt = depositAmount / exchangeRate;
-
-      // Settlement (Theoretical)
-      const netNative = depositAmount - feeNative - commNative;
-      let settlementUsdt = netNative / exchangeRate;
-
-      // --- ACTUAL PROFIT (Only Completed) ---
+      // ACTUAL profit: only completed transactions
       if (t.fund_status === '已完成交易') {
         const acceptanceUsdt = parseFloat(t.acceptance_usdt) || 0;
-        // Correct logic: Gross Acceptance (or estimated gross from initial) minus Gross Initial
+        // Exchange profit = what we actually received back minus what we sent
+        // If acceptance_usdt is recorded, use it; otherwise assume no exchange gain/loss
         const actualAcceptance = acceptanceUsdt > 0 ? acceptanceUsdt : initialUsdt;
         const exchangeProfit = actualAcceptance - initialUsdt;
 
@@ -195,9 +201,10 @@ export default function Dashboard() {
         completedCount++;
       }
 
-      // --- ESTIMATED PROFIT (All Valid, Excluding Frozen/Returned) ---
+      // ESTIMATED profit: all valid transactions (waiting, processing, completed)
       const acceptanceUsdt = parseFloat(t.acceptance_usdt) || 0;
-      const estimatedAcceptance = acceptanceUsdt > 0 ? acceptanceUsdt : (settlementUsdt + commissionUsdt + feeUsdt);
+      // For estimated: if acceptance recorded use it, else assume no exchange gain (0)
+      const estimatedAcceptance = acceptanceUsdt > 0 ? acceptanceUsdt : initialUsdt;
       const estimatedExchangeProfit = estimatedAcceptance - initialUsdt;
 
       estimatedCommission += commissionUsdt;
@@ -206,7 +213,6 @@ export default function Dashboard() {
       estimatedCount++;
     }
 
-    // Total Profit includes Violation Penalty
     const totalProfit = totalCommission + totalTransferFee + totalExchangeRateProfit + totalViolationPenalty;
     const estimatedProfit = estimatedCommission + estimatedTransferFee + estimatedExchangeRateProfit + estimatedViolationPenalty;
 
@@ -217,14 +223,14 @@ export default function Dashboard() {
       violationPenalty: totalViolationPenalty,
       frozenFunds: totalFrozenFunds,
       profit: totalProfit,
-      completedCount: completedCount,
+      completedCount,
 
-      estimatedCommission: estimatedCommission,
-      estimatedTransferFee: estimatedTransferFee,
-      estimatedExchangeRateProfit: estimatedExchangeRateProfit,
-      estimatedViolationPenalty: estimatedViolationPenalty,
-      estimatedProfit: estimatedProfit,
-      estimatedCount: estimatedCount
+      estimatedCommission,
+      estimatedTransferFee,
+      estimatedExchangeRateProfit,
+      estimatedViolationPenalty,
+      estimatedProfit,
+      estimatedCount
     };
   };
 
