@@ -41,7 +41,7 @@ export default function Dashboard() {
       try {
         const [transactionData, userData] = await Promise.all([
           Transaction.list("-created_date", 1000),
-          User.me()
+          base44.auth.me()
         ]);
         setTransactions(transactionData);
         setCurrentUser(userData);
