@@ -927,13 +927,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
     
-    // 检测是否是水单信息
-    const keywords = ['汇款', '转账', '币种', '金额', '账户', '银行', 'IBAN', '查收', '收款', '维护期'];
-    const hasKeywords = keywords.some(k => messageText.toLowerCase().includes(k.toLowerCase()));
+    // 🆕 增强关键词检测 - 汇款/转账触发词 + 附件识别
+    const transactionTriggerKeywords = ['汇款', '转账', '水单', '汇款单', '币种', '金额', '查收', '收款', '维护期', 'IBAN', '银行', '账户'];
+    const hasKeywords = transactionTriggerKeywords.some(k => messageText.toLowerCase().includes(k.toLowerCase()));
     
-    // 只有在明确是水单（有关键字 或 已识别出转账数据）时才继续处理为交易
-    // 如果只是普通聊天消息，则只保存消息记录即可
-    if (!hasKeywords && !transferData) {
+    // 若消息包含"水单"/"转账"/"汇款"关键词但没有附件，纯文本也触发处理
+    const isPureTextTransaction = hasKeywords && photos.length === 0 && !message.document;
+    
+    // 若识别到附件是转账单 → 自动触发
+    const isAutoTriggered = !!transferData;
+    
+    // 如果只是普通聊天或仅有证件，不继续处理
+    if (!hasKeywords && !isAutoTriggered) {
        console.log('ℹ️ 仅存档消息，非交易指令');
        return new Response(JSON.stringify({ ok: true }), { status: 200 });
     }
