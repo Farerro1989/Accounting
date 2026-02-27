@@ -294,7 +294,7 @@ export default function Dashboard() {
   );
 
   // 统计各个入款账户（按公司+币种分类）
-  const accountStats = React.useMemo(() => {
+  const accountStats = useMemo(() => {
   const filteredTxns = getFilteredTransactions();
   const stats = {};
 
