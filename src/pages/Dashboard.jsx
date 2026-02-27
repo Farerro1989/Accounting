@@ -66,7 +66,7 @@ export default function Dashboard() {
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      const data = await Transaction.list("-created_date", 1000);
+      const data = await base44.entities.Transaction.list("-created_date", 1000);
       setTransactions(data);
     } catch (error) {
       console.error("加载交易数据失败:", error);
