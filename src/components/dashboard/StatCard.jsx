@@ -27,6 +27,24 @@ const colorVariants = {
     border: "border-purple-200",
     iconBg: "bg-gradient-to-r from-purple-500 to-violet-500", 
     text: "text-purple-600"
+  },
+  indigo: {
+    bg: "bg-gradient-to-br from-indigo-50 to-blue-50",
+    border: "border-indigo-200",
+    iconBg: "bg-gradient-to-r from-indigo-500 to-blue-500",
+    text: "text-indigo-600"
+  },
+  red: {
+    bg: "bg-gradient-to-br from-red-50 to-rose-50",
+    border: "border-red-200",
+    iconBg: "bg-gradient-to-r from-red-500 to-rose-500",
+    text: "text-red-600"
+  },
+  orange: {
+    bg: "bg-gradient-to-br from-orange-50 to-amber-50",
+    border: "border-orange-200",
+    iconBg: "bg-gradient-to-r from-orange-500 to-amber-500",
+    text: "text-orange-600"
   }
 };
 
