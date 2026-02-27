@@ -14,8 +14,9 @@ export default function ProfitReportTable({ transactions }) {
     const groupedData = {};
 
     transactions.forEach(t => {
-      if (!t.created_date) return;
-      const date = new Date(t.created_date);
+      const dateStr = t.deposit_date || t.created_date;
+      if (!dateStr) return;
+      const date = new Date(dateStr);
       let key;
       let label;
       let sortKey;
