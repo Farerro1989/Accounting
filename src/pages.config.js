@@ -57,6 +57,7 @@ import ExpenseDashboard from './pages/ExpenseDashboard';
 import ExpenseList from './pages/ExpenseList';
 import ExpenseReports from './pages/ExpenseReports';
 import Home from './pages/Home';
+import Profile from './pages/Profile';
 import ProfitDetails from './pages/ProfitDetails';
 import ReadOnlyView from './pages/ReadOnlyView';
 import SystemSelector from './pages/SystemSelector';
@@ -64,7 +65,6 @@ import TelegramMessages from './pages/TelegramMessages';
 import TelegramSetup from './pages/TelegramSetup';
 import Transactions from './pages/Transactions';
 import UserManagement from './pages/UserManagement';
-import Profile from './pages/Profile';
 import __Layout from './Layout.jsx';
 
 
@@ -79,6 +79,7 @@ export const PAGES = {
     "ExpenseList": ExpenseList,
     "ExpenseReports": ExpenseReports,
     "Home": Home,
+    "Profile": Profile,
     "ProfitDetails": ProfitDetails,
     "ReadOnlyView": ReadOnlyView,
     "SystemSelector": SystemSelector,
@@ -86,7 +87,6 @@ export const PAGES = {
     "TelegramSetup": TelegramSetup,
     "Transactions": Transactions,
     "UserManagement": UserManagement,
-    "Profile": Profile,
 }
 
 export const pagesConfig = {

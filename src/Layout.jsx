@@ -72,11 +72,11 @@ export default function Layout({ children, currentPageName }) {
   };
 
   const hasPermission = (permission) => {
+    if (!permission) return true; // 无权限要求的菜单始终显示
     if (loading) return false;
     if (!user) return false;
     if (user.role === 'admin') return true;
     if (permission === 'is_admin') return user.role === 'admin';
-    if (!permission) return true;
     return user.permissions?.[permission] === true;
   };
 
