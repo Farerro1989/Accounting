@@ -944,7 +944,8 @@ Deno.serve(async (req) => {
     }
 
     // 如果是水单，发送处理中提示
-    await sendTelegramMessage(chatId, '🔄 正在处理水单信息...', messageId);
+    const triggerReason = isAutoTriggered ? '检测到转账单附件' : '检测到汇款关键词';
+    await sendTelegramMessage(chatId, `🔄 ${triggerReason}，正在自动处理水单信息...`, messageId);
     
     // 解析文本 (优先使用正则，如果关键信息缺失，尝试LLM分析)
     let textData = parseWaterSlip(messageText);
