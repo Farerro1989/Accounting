@@ -47,49 +47,28 @@ export default function TransactionList({ transactions, loading, onEdit, onDelet
     );
   }
 
-  // 安全的日期格式化函数
   const safeFormatDate = (dateString, formatString = "yyyy-MM-dd") => {
     try {
       if (!dateString) return "-";
-
-      let date;
-      if (typeof dateString === 'string') {
-        // Try parsing as ISO string first
-        date = parseISO(dateString);
-        // Fallback to new Date() if parseISO fails or results in invalid date
-        if (!isValid(date)) {
-          date = new Date(dateString);
-        }
-      } else if (dateString instanceof Date) {
-        date = dateString;
-      } else {
-        // For numbers or other types, try converting to Date object
-        date = new Date(dateString);
-      }
-
-      if (!isValid(date)) {
-        console.warn('无效日期:', dateString);
-        return "-";
-      }
-
+      let date = typeof dateString === 'string' ? parseISO(dateString) : new Date(dateString);
+      if (!isValid(date)) date = new Date(dateString);
+      if (!isValid(date)) return "-";
       return format(date, formatString);
-    } catch (error) {
-      console.error('日期格式化错误:', error, '原始日期:', dateString);
+    } catch {
       return "-";
     }
   };
 
-  // Mobile card view
+  const getMaintenance = (transaction) => {
+    if (!transaction.maintenance_end_date) return {};
+    const today = new Date(); today.setHours(0,0,0,0);
+    const endDate = new Date(transaction.maintenance_end_date); endDate.setHours(0,0,0,0);
+    const daysLeft = Math.ceil((endDate - today) / 86400000);
+    return { daysLeft, isExpiring: daysLeft <= 3 && daysLeft >= 0, isExpired: daysLeft < 0 };
+  };
+
   const MobileCard = ({ transaction }) => {
-    const today = new Date();
-    let daysLeft = null, isExpiring = false, isExpired = false;
-    if (transaction.maintenance_end_date) {
-      const endDate = new Date(transaction.maintenance_end_date);
-      today.setHours(0,0,0,0); endDate.setHours(0,0,0,0);
-      daysLeft = Math.ceil((endDate - today) / 86400000);
-      isExpiring = daysLeft <= 3 && daysLeft >= 0;
-      isExpired = daysLeft < 0;
-    }
+    const { daysLeft, isExpiring, isExpired } = getMaintenance(transaction);
     return (
       <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2 shadow-sm">
         <div className="flex items-center justify-between">
@@ -145,168 +124,97 @@ export default function TransactionList({ transactions, loading, onEdit, onDelet
       <div className="flex flex-col gap-3 md:hidden">
         {transactions.map(t => <MobileCard key={t.id} transaction={t} />)}
       </div>
+
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-slate-50">
-            <TableHead>编号</TableHead>
-            <TableHead>客户信息</TableHead>
-            <TableHead>收款账户</TableHead>
-            <TableHead>币种/金额</TableHead>
-            <TableHead>汇款日期</TableHead>
-            <TableHead>维护期</TableHead>
-            <TableHead>汇率/佣金</TableHead>
-            <TableHead>结算客户U</TableHead>
-            <TableHead>承兑回U</TableHead>
-            <TableHead>状态</TableHead>
-            <TableHead>创建时间</TableHead>
-            <TableHead>操作</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {transactions.map((transaction) => {
-            // 计算维护期剩余天数
-            const today = new Date();
-            let daysLeft = null;
-            let isExpiring = false;
-            let isExpired = false;
-
-            if (transaction.maintenance_end_date) {
-              const endDate = new Date(transaction.maintenance_end_date);
-              // Set both dates to start of day to accurately compare days
-              today.setHours(0, 0, 0, 0);
-              endDate.setHours(0, 0, 0, 0);
-
-              daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-              isExpiring = daysLeft <= 3 && daysLeft >= 0;
-              isExpired = daysLeft < 0;
-            }
-            
-            return (
-              <TableRow key={transaction.id} className="hover:bg-slate-50/50">
-                <TableCell>
-                  <div className="font-mono text-xs">
-                    {transaction.transaction_number || '-'}
-                  </div>
-                </TableCell>
-
-                <TableCell>
-                  <div>
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-slate-50">
+              <TableHead>编号</TableHead>
+              <TableHead>客户信息</TableHead>
+              <TableHead>收款账户</TableHead>
+              <TableHead>币种/金额</TableHead>
+              <TableHead>汇款日期</TableHead>
+              <TableHead>维护期</TableHead>
+              <TableHead>汇率/佣金</TableHead>
+              <TableHead>结算客户U</TableHead>
+              <TableHead>承兑回U</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead>创建时间</TableHead>
+              <TableHead>操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {transactions.map((transaction) => {
+              const { daysLeft, isExpiring, isExpired } = getMaintenance(transaction);
+              return (
+                <TableRow key={transaction.id} className="hover:bg-slate-50/50">
+                  <TableCell>
+                    <div className="font-mono text-xs">{transaction.transaction_number || '-'}</div>
+                  </TableCell>
+                  <TableCell>
                     <p className="font-medium text-slate-900">{transaction.customer_name}</p>
-                  </div>
-                </TableCell>
-
-                <TableCell>
-                  <div>
+                  </TableCell>
+                  <TableCell>
                     <p className="text-sm font-medium">{transaction.receiving_account_name}</p>
                     <p className="text-xs text-slate-500 font-mono">{transaction.receiving_account_number}</p>
-                  </div>
-                </TableCell>
-
-                <TableCell>
-                  <div>
+                  </TableCell>
+                  <TableCell>
                     <p className="font-medium">{transaction.currency}</p>
                     <p className="text-sm text-slate-600">{transaction.deposit_amount?.toLocaleString()}</p>
-                  </div>
-                </TableCell>
-
-                <TableCell className="text-sm">
-                  {safeFormatDate(transaction.deposit_date)}
-                </TableCell>
-
-                <TableCell>
-                  <div>
+                  </TableCell>
+                  <TableCell className="text-sm">{safeFormatDate(transaction.deposit_date)}</TableCell>
+                  <TableCell>
                     <p className="text-sm">{transaction.maintenance_days ? `${transaction.maintenance_days}天` : '-'}</p>
                     {transaction.maintenance_end_date && (
-                      <p className={`text-xs ${
-                        isExpired ? 'text-red-600 font-semibold' : 
-                        isExpiring ? 'text-orange-600 font-semibold' : 
-                        'text-slate-500'
-                      }`}>
-                        {isExpired ? '已过期' : 
-                         (isExpiring && daysLeft >= 0) ? `${daysLeft}天后到期` : 
-                         (daysLeft !== null && daysLeft >= 0) ? `剩${daysLeft}天` : ''}
+                      <p className={`text-xs ${isExpired ? 'text-red-600 font-semibold' : isExpiring ? 'text-orange-600 font-semibold' : 'text-slate-500'}`}>
+                        {isExpired ? '已过期' : isExpiring && daysLeft >= 0 ? `${daysLeft}天后到期` : daysLeft !== null && daysLeft >= 0 ? `剩${daysLeft}天` : ''}
                       </p>
                     )}
-                  </div>
-                </TableCell>
-
-                <TableCell>
-                  <div>
+                  </TableCell>
+                  <TableCell>
                     <p className="text-sm">{transaction.exchange_rate}</p>
                     <p className="text-xs text-slate-500">{transaction.commission_percentage}%</p>
-                  </div>
-                </TableCell>
-
-                <TableCell className="font-mono font-medium text-orange-600">
-                  {transaction.settlement_usdt?.toFixed(2)}
-                </TableCell>
-
-                <TableCell className="font-mono font-medium text-blue-600">
-                  {transaction.acceptance_usdt ? transaction.acceptance_usdt.toFixed(2) : '-'}
-                </TableCell>
-
-                <TableCell>
-                  <Badge className={`${statusColors[transaction.fund_status]} border text-xs`}>
-                    {transaction.fund_status}
-                  </Badge>
-                </TableCell>
-
-                <TableCell className="text-sm text-slate-600">
-                  {safeFormatDate(transaction.created_date, "yyyy-MM-dd HH:mm")}
-                </TableCell>
-
-                <TableCell>
-                  <div className="flex gap-1">
-                    {permissions?.can_edit_transactions && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onEdit(transaction)}
-                        className="hover:bg-blue-50 hover:text-blue-600"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                    )}
-
-                    {permissions?.can_delete_transactions && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="hover:bg-red-50 hover:text-red-600"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>确认删除</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              您确定要删除客户 "{transaction.customer_name}" 的这笔交易吗？此操作不可撤销。
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>取消</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => onDelete(transaction.id)}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              删除
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                  </TableCell>
+                  <TableCell className="font-mono font-medium text-orange-600">{transaction.settlement_usdt?.toFixed(2)}</TableCell>
+                  <TableCell className="font-mono font-medium text-blue-600">{transaction.acceptance_usdt ? transaction.acceptance_usdt.toFixed(2) : '-'}</TableCell>
+                  <TableCell>
+                    <Badge className={`${statusColors[transaction.fund_status]} border text-xs`}>{transaction.fund_status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-slate-600">{safeFormatDate(transaction.created_date, "yyyy-MM-dd HH:mm")}</TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {permissions?.can_edit_transactions && (
+                        <Button variant="ghost" size="sm" onClick={() => onEdit(transaction)} className="hover:bg-blue-50 hover:text-blue-600">
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {permissions?.can_delete_transactions && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="hover:bg-red-50 hover:text-red-600">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>确认删除</AlertDialogTitle>
+                              <AlertDialogDescription>您确定要删除客户 "{transaction.customer_name}" 的这笔交易吗？此操作不可撤销。</AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>取消</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => onDelete(transaction.id)} className="bg-red-600 hover:bg-red-700">删除</AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
     </>
   );
