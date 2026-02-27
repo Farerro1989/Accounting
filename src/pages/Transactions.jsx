@@ -16,6 +16,7 @@ import { importTransactionsFromCsv } from "@/functions/importTransactionsFromCsv
 import TransactionForm from "../components/transactions/TransactionForm";
 import TransactionList from "../components/transactions/TransactionList";
 import TransactionFilters from "../components/transactions/TransactionFilters";
+import TransactionCharts from "../components/transactions/TransactionCharts";
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
