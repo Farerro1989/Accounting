@@ -22,6 +22,7 @@ const settlementMenuItems = [
   { title: "仪表盘", url: createPageUrl("Dashboard"), icon: LayoutDashboard, requiredPermission: null },
   { title: "交易管理", url: createPageUrl("Transactions"), icon: CreditCard, requiredPermission: null },
   { title: "盈利分析", url: createPageUrl("Analytics"), icon: TrendingUp, requiredPermission: 'can_view_profit_data' },
+  { title: "AI智能报告", url: createPageUrl("AIReport"), icon: Brain, requiredPermission: 'can_view_profit_data' },
   { title: "数据备份", url: createPageUrl("DataBackup"), icon: Database, requiredPermission: 'is_admin' },
   { title: "消息中心", url: createPageUrl("TelegramMessages"), icon: MessageSquare, requiredPermission: null },
   { title: "Telegram设置", url: createPageUrl("TelegramSetup"), icon: Bot, requiredPermission: 'is_admin' },
