@@ -3,6 +3,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const APP_URL = Deno.env.get("APP_URL") || "";
+// 群播通知：从环境变量读取需要广播的群 chat_id（逗号分隔），若未设置则不广播
+const BROADCAST_CHAT_IDS = (Deno.env.get("BROADCAST_CHAT_IDS") || "").split(",").map(s => s.trim()).filter(Boolean);
 
 // ============= Telegram API 函数 =============
 
