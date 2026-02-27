@@ -25,8 +25,41 @@ export default function ExpenseTable({ expenses, loading, onEdit, onDelete }) {
     );
   }
 
+  const MobileCard = ({ expense }) => (
+    <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2 shadow-sm">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold text-slate-900">{expense.title}</span>
+        <span className="font-bold text-emerald-600">{expense.usdt_amount?.toLocaleString(undefined, {minimumFractionDigits:2,maximumFractionDigits:2})} USDT</span>
+      </div>
+      <div className="flex items-center gap-2 text-xs">
+        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">{expense.category}</Badge>
+        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">x{expense.quantity || 1}</Badge>
+        <span className="text-slate-500">{expense.payment_method}</span>
+      </div>
+      <div className="flex items-center justify-between text-xs text-slate-500">
+        <span>{expense.amount?.toLocaleString(undefined,{minimumFractionDigits:2})} {expense.currency?.substring(0,3)}</span>
+        <span>{format(new Date(expense.expense_date), "yyyy-MM-dd")}</span>
+      </div>
+      {expense.description && <p className="text-xs text-slate-400 truncate">{expense.description}</p>}
+      <div className="flex gap-2 pt-1">
+        <Button variant="outline" size="sm" onClick={() => onEdit(expense)} className="flex-1 text-xs">
+          <Edit className="w-3 h-3 mr-1" />编辑
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onDelete(expense.id)} className="flex-1 text-xs text-red-600 border-red-200">
+          <Trash2 className="w-3 h-3 mr-1" />删除
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="overflow-x-auto">
+    <>
+      {/* Mobile cards */}
+      <div className="flex flex-col gap-3 md:hidden">
+        {expenses.map(e => <MobileCard key={e.id} expense={e} />)}
+      </div>
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50">
