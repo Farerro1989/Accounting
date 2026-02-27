@@ -79,8 +79,74 @@ export default function TransactionList({ transactions, loading, onEdit, onDelet
     }
   };
 
+  // Mobile card view
+  const MobileCard = ({ transaction }) => {
+    const today = new Date();
+    let daysLeft = null, isExpiring = false, isExpired = false;
+    if (transaction.maintenance_end_date) {
+      const endDate = new Date(transaction.maintenance_end_date);
+      today.setHours(0,0,0,0); endDate.setHours(0,0,0,0);
+      daysLeft = Math.ceil((endDate - today) / 86400000);
+      isExpiring = daysLeft <= 3 && daysLeft >= 0;
+      isExpired = daysLeft < 0;
+    }
+    return (
+      <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-2 shadow-sm">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-xs text-slate-400">{transaction.transaction_number || '-'}</span>
+          <Badge className={`${statusColors[transaction.fund_status]} border text-xs`}>{transaction.fund_status}</Badge>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-slate-900">{transaction.customer_name}</span>
+          <span className="font-bold text-emerald-600">{transaction.currency?.substring(0,3)} {transaction.deposit_amount?.toLocaleString()}</span>
+        </div>
+        <div className="text-xs text-slate-500 flex justify-between">
+          <span>{transaction.receiving_account_name}</span>
+          <span>{safeFormatDate(transaction.deposit_date)}</span>
+        </div>
+        {transaction.maintenance_end_date && (
+          <div className={`text-xs ${isExpired ? 'text-red-600 font-semibold' : isExpiring ? 'text-orange-600 font-semibold' : 'text-slate-500'}`}>
+            维护期: {isExpired ? '已过期' : daysLeft !== null ? `剩${daysLeft}天` : '-'}
+          </div>
+        )}
+        <div className="flex gap-2 pt-1">
+          {permissions?.can_edit_transactions && (
+            <Button variant="outline" size="sm" onClick={() => onEdit(transaction)} className="flex-1 text-xs">
+              <Edit className="w-3 h-3 mr-1" />编辑
+            </Button>
+          )}
+          {permissions?.can_delete_transactions && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="sm" className="flex-1 text-xs text-red-600 border-red-200">
+                  <Trash2 className="w-3 h-3 mr-1" />删除
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>确认删除</AlertDialogTitle>
+                  <AlertDialogDescription>确定要删除 "{transaction.customer_name}" 的这笔交易吗？此操作不可撤销。</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>取消</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => onDelete(transaction.id)} className="bg-red-600 hover:bg-red-700">删除</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="overflow-x-auto">
+    <>
+      {/* Mobile card list */}
+      <div className="flex flex-col gap-3 md:hidden">
+        {transactions.map(t => <MobileCard key={t.id} transaction={t} />)}
+      </div>
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50">

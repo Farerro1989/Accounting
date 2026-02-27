@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { createPageUrl } from "@/utils";
 import { LayoutDashboard, CreditCard, Users, TrendingUp, Bot, LogOut, Database, Wallet, List, FolderTree, BarChart3, Home, MessageSquare, Brain } from "lucide-react";
+import BottomTabBar from "./components/mobile/BottomTabBar";
 import { User } from "@/entities/User";
 import {
   Sidebar,
