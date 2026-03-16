@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
 // ============= 配置 =============
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");

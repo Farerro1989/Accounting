@@ -1,7 +1,6 @@
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 
-import { createClientFromRequest } from 'npm:@base44/sdk@0.7.1';
-
-const BOT_TOKEN = Deno.env.get("EXPENSE_BOT_TOKEN");
+const BOT_TOKEN = Deno.env.get("EXPENSE_BOT_TOKEN") || Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 
 // ============= Telegram API 函数 =============
