@@ -170,7 +170,10 @@ ${text}
     if (!result) return null;
     const mapped = {};
     if (result.amount) mapped.deposit_amount = result.amount;
-    if (result.currency) mapped.currency = result.currency;
+    if (result.currency) {
+      const normalized = normalizeCurrency(result.currency);
+      mapped.currency = normalized || result.currency;
+    }
     if (result.customer_name) mapped.customer_name = result.customer_name;
     if (result.receiving_account_name) mapped.receiving_account_name = result.receiving_account_name;
     if (result.receiving_account_number) mapped.receiving_account_number = result.receiving_account_number;
