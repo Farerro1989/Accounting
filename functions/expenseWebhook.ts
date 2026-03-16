@@ -371,6 +371,18 @@ Deno.serve(async (req) => {
       ...textData,
       ...(imageData || {})
     };
+
+    // Normalize currency to match entity enum format (e.g. "EUR" -> "EUR欧元")
+    const EXPENSE_CURRENCY_MAP = {
+      'EUR': 'EUR欧元', 'USD': 'USD美元', 'MYR': 'MYR马币',
+      '欧元': 'EUR欧元', '美元': 'USD美元', '马币': 'MYR马币',
+      'EUR欧元': 'EUR欧元', 'USD美元': 'USD美元', 'MYR马币': 'MYR马币'
+    };
+    if (mergedData.currency) {
+      const upperCurr = String(mergedData.currency).toUpperCase();
+      const matched = Object.entries(EXPENSE_CURRENCY_MAP).find(([k]) => upperCurr.includes(k.toUpperCase()));
+      mergedData.currency = matched ? matched[1] : (EXPENSE_CURRENCY_MAP[mergedData.currency] || 'USD美元');
+    }
     
     console.log('📊 合并后数据:', mergedData);
     
