@@ -4,7 +4,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const APP_URL = Deno.env.get("APP_URL") || "";
-const BROADCAST_CHAT_IDS = (Deno.env.get("BROADCAST_CHAT_IDS") || "")
+const BROADCAST_CHAT_IDS = (Deno.env.get("BROADCAST_CHAT_IDS") ?? "")
   .split(",").map(s => s.trim()).filter(Boolean);
 
 const CURRENCY_MAP = {
