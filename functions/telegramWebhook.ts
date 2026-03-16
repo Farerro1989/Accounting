@@ -277,13 +277,22 @@ function mergeTransferData(transferData, textData) {
     if (normalized) merged.currency = normalized;
   }
 
-  if (td.recipient_name && !merged.receiving_account_name) merged.receiving_account_name = td.recipient_name;
-  if (td.account_number) {
-    if (!merged.receiving_account_number) merged.receiving_account_number = td.account_number;
-    if (!merged.bank_account) merged.bank_account = td.account_number;
+  // Handle both image analysis fields (recipient_name, account_number, transfer_date)
+  // and document analysis fields (receiving_account_name, receiving_account_number, date, customer_name)
+  const recipientName = td.recipient_name || td.receiving_account_name;
+  const accountNumber = td.account_number || td.receiving_account_number;
+  const depositDate = td.transfer_date || td.date;
+  const customerName = td.customer_name;
+
+  if (recipientName && !merged.receiving_account_name) merged.receiving_account_name = recipientName;
+  if (accountNumber) {
+    if (!merged.receiving_account_number) merged.receiving_account_number = accountNumber;
+    if (!merged.bank_account) merged.bank_account = accountNumber;
   }
   if (td.bank_name && !merged.bank_name) merged.bank_name = td.bank_name;
-  if (td.transfer_date && !merged.deposit_date) merged.deposit_date = td.transfer_date;
+  if (depositDate && !merged.deposit_date) merged.deposit_date = depositDate;
+  if (customerName && !merged.customer_name) merged.customer_name = customerName;
+  if (td.maintenance_days && !merged.maintenance_days) merged.maintenance_days = td.maintenance_days;
 
   return merged;
 }
