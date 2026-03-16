@@ -4,8 +4,8 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.20';
 const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
 const APP_URL = Deno.env.get("APP_URL") || "";
-const BROADCAST_CHAT_IDS = (Deno.env.get("BROADCAST_CHAT_IDS") ?? "")
-  .split(",").map(s => s.trim()).filter(Boolean);
+// Broadcast disabled - set BROADCAST_CHAT_IDS in code if needed
+const BROADCAST_CHAT_IDS = [];
 
 const CURRENCY_MAP = {
   'EUR': 'EUR欧元', 'USD': 'USD美元', 'GBP': 'GBP英镑',
